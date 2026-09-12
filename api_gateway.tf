@@ -103,20 +103,21 @@ resource "aws_apigatewayv2_integration" "bff" {
   integration_uri    = aws_lb_listener.bff.arn
 }
 
-resource "aws_apigatewayv2_route" "bff" {
-  # mvp.md §4.3: las 5 rutas de esta edicion comparten el mismo authorizer (jwt-basico) y el
-  # mismo backend (bff via VPC Link) — ya no hay split por rol ni por issuer (TD-17 cerrado).
-  for_each = toset([
-    "GET /api/v1/espacios-comunes",
-    "POST /api/v1/espacios-comunes/{id}/reservas",
-    "GET /api/v1/espacios-comunes/reservas",
-    "GET /api/v1/gastos-comunes",
-    "GET /api/v1/panel",
-  ])
-
+# Ruta proxy comodín para toda la API hacia el BFF.
+# Permite todas las operaciones (GET, POST, PUT, PATCH, DELETE) sin requerir
+# registrar manualmente cada endpoint nuevo de gastos o espacios en Terraform.
+resource "aws_apigatewayv2_route" "bff_proxy" {
   api_id             = aws_apigatewayv2_api.main.id
-  route_key          = each.value
+  route_key          = "ANY /api/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.bff.id}"
   authorization_type = "CUSTOM"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt_basico.id
+}
+
+# Endpoint de healthcheck público sin autenticación (permite monitoreo externo de API Gateway -> BFF)
+resource "aws_apigatewayv2_route" "health" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /health"
+  target             = "integrations/${aws_apigatewayv2_integration.bff.id}"
+  authorization_type = "NONE"
 }

@@ -262,7 +262,11 @@ resource "aws_ecs_task_definition" "domain" {
       environment = concat(
         local.identity_env,
         [
-          { name = "RABBITMQ_HOST", value = "rabbitmq.convivo.local" },
+          # RabbitMQ se resuelve a través del NLB interno (Cloud Map bloqueado en Learner Lab)
+          { name = "RABBITMQ_HOST", value = aws_lb.internal.dns_name },
+          { name = "RABBITMQ_PORT", value = "5672" },
+          { name = "RABBITMQ_URLS", value = "${aws_lb.internal.dns_name}:5672" },
+          { name = "RABBITMQ_SSL_ENABLED", value = "false" },
           { name = "DB_HOST", value = "localhost" },
           { name = "DB_PORT", value = "1521" },
           # DB_NAME es el service name del DSN, no un nombre lógico: la imagen

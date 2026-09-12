@@ -62,3 +62,29 @@ resource "aws_lb_listener" "domain" {
     target_group_arn = aws_lb_target_group.domain[each.key].arn
   }
 }
+
+# RabbitMQ también se resuelve a través del NLB: Cloud Map no está disponible
+# en Learner Lab (LabRole sin permiso de Service Discovery) y las IPs de Fargate son efímeras.
+resource "aws_lb_target_group" "rabbitmq" {
+  name        = "${var.project}-tg-rabbitmq"
+  port        = 5672
+  protocol    = "TCP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    protocol = "TCP"
+    port     = "5672"
+  }
+}
+
+resource "aws_lb_listener" "rabbitmq" {
+  load_balancer_arn = aws_lb.internal.arn
+  port              = 5672
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.rabbitmq.arn
+  }
+}
