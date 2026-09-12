@@ -12,7 +12,7 @@ resource "aws_apigatewayv2_api" "main" {
 
   cors_configuration {
     allow_origins = [var.frontend_admin_origin, var.frontend_residente_origin] # ambos quedan en GitHub Pages, no en AWS
-    allow_methods = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     allow_headers = ["Authorization", "Content-Type"]
   }
 }
@@ -104,13 +104,18 @@ resource "aws_apigatewayv2_integration" "bff" {
 }
 
 resource "aws_apigatewayv2_route" "bff" {
-  # mvp.md §4.3: las 5 rutas de esta edicion comparten el mismo authorizer (jwt-basico) y el
-  # mismo backend (bff via VPC Link) — ya no hay split por rol ni por issuer (TD-17 cerrado).
+  # Catch-all por dominio, alineado a los controllers reales del bff (no rutas
+  # puntuales por operacion): GastosProxyController vive en /api/gastos/*path
+  # y reenvia tal cual al microservicio (de ahi el /api duplicado que arma el
+  # frontend, ver gastos-comunes.service.ts); EspaciosProxyController vive en
+  # /api/v1/espacios-comunes(/*path) y cubre tanto espacios como reservas. El
+  # authorizer sigue siendo el mismo para todas (TD-17 cerrado) y la
+  # autorizacion por rol (admin/conserje/comite) la resuelve RolesGuard en el
+  # bff, no el gateway.
   for_each = toset([
-    "GET /api/v1/espacios-comunes",
-    "POST /api/v1/espacios-comunes/{id}/reservas",
-    "GET /api/v1/espacios-comunes/reservas",
-    "GET /api/v1/gastos-comunes",
+    "ANY /api/gastos/{proxy+}",
+    "ANY /api/v1/espacios-comunes",
+    "ANY /api/v1/espacios-comunes/{proxy+}",
     "GET /api/v1/panel",
   ])
 
