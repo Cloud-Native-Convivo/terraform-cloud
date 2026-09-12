@@ -103,25 +103,29 @@ resource "aws_apigatewayv2_integration" "bff" {
   integration_uri    = aws_lb_listener.bff.arn
 }
 
-resource "aws_apigatewayv2_route" "bff" {
-  # Catch-all por dominio, alineado a los controllers reales del bff (no rutas
-  # puntuales por operacion): GastosProxyController vive en /api/gastos/*path
-  # y reenvia tal cual al microservicio (de ahi el /api duplicado que arma el
-  # frontend, ver gastos-comunes.service.ts); EspaciosProxyController vive en
-  # /api/v1/espacios-comunes(/*path) y cubre tanto espacios como reservas. El
-  # authorizer sigue siendo el mismo para todas (TD-17 cerrado) y la
-  # autorizacion por rol (admin/conserje/comite) la resuelve RolesGuard en el
-  # bff, no el gateway.
+# Ruta proxy comodín para toda la API privada hacia el BFF.
+# Permite todas las operaciones CRUD (GET, POST, PUT, PATCH, DELETE) protegidas por JWT.
+resource "aws_apigatewayv2_route" "bff_proxy" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "ANY /api/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.bff.id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt_basico.id
+}
+
+# Endpoints públicos sin autenticación:
+# 1. Healthcheck (monitoreo externo de API Gateway -> BFF)
+# 2. Catálogo público de espacios comunes (Home de productos/espacios accesible sin login)
+resource "aws_apigatewayv2_route" "public" {
   for_each = toset([
-    "ANY /api/gastos/{proxy+}",
-    "ANY /api/v1/espacios-comunes",
-    "ANY /api/v1/espacios-comunes/{proxy+}",
-    "GET /api/v1/panel",
+    "GET /health",
+    "GET /api/health",
+    "GET /api/v1/espacios-comunes",
+    "GET /api/v1/espacios-comunes/espacios",
   ])
 
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = each.value
   target             = "integrations/${aws_apigatewayv2_integration.bff.id}"
-  authorization_type = "CUSTOM"
-  authorizer_id      = aws_apigatewayv2_authorizer.jwt_basico.id
+  authorization_type = "NONE"
 }

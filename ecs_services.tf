@@ -59,6 +59,14 @@ resource "aws_ecs_service" "rabbitmq" {
       base              = capacity_provider_strategy.value.base
     }
   }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.rabbitmq.arn
+    container_name   = "rabbitmq"
+    container_port   = 5672
+  }
+
+  depends_on = [aws_lb_listener.rabbitmq]
 }
 
 resource "aws_ecs_service" "bff" {
