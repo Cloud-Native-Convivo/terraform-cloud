@@ -1,0 +1,15 @@
+# Copiar a terraform.tfvars (gitignored) y completar con valores reales.
+
+docker_hub_user = "tu-usuario-dockerhub"
+
+# App Registration de Entra ID que representa esta API — exclusivo ADMIN (mvp.md §1.2).
+entra_tenant_id = "00000000-0000-0000-0000-000000000000"
+entra_audience  = "00000000-0000-0000-0000-000000000000"
+
+# App OAuth de Google Cloud, usada como Identity Provider federado en Cognito — exclusivo RESIDENTE.
+cognito_google_client_id     = "tu-google-client-id"
+cognito_google_client_secret = "tu-google-client-secret"
+
+# Origins exactos de GitHub Pages, sin slash final (ej. https://tu-usuario.github.io/Cloud-Native).
+frontend_admin_origin     = "https://tu-usuario.github.io/nombre-repo-admin"
+frontend_residente_origin = "https://tu-usuario.github.io/nombre-repo-residente"
