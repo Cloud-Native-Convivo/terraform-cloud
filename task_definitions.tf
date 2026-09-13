@@ -318,6 +318,7 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "MANAGEMENT_HEALTH_RABBIT_ENABLED", value = "false" },
           { name = "CONVIVO_ENTRA_CLAIMMAP_ADMIN", value = "administrador" },
           { name = "EUREKA_ENABLED", value = "false" },
+          { name = "JAVA_TOOL_OPTIONS", value = "-Doracle.jdbc.timezoneAsRegion=false -Duser.timezone=UTC" },
         ] : [],
         [for k, v in lookup(var.service_env_vars, each.key, {}) : { name = k, value = v }]
       )
