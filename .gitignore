@@ -7,3 +7,4 @@ crash.log
 aws-credentials
 aws-credential
 *.zip
+.codegraph/

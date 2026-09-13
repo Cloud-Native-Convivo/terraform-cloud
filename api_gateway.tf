@@ -89,6 +89,9 @@ resource "aws_apigatewayv2_authorizer" "jwt_basico" {
   enable_simple_responses           = true
   identity_sources                  = ["$request.header.Authorization"]
   name                              = "jwt-basico"
+  # Sin esto, API Gateway cachea la decision (default AWS 300s) por token:
+  # un 401/403 justo despues de un login puede quedar pegado 5 minutos.
+  authorizer_result_ttl_in_seconds = 0
 }
 # No valida firma/issuer/audience/rol (RF-T.3) — esa resolucion completa vive en el bff
 # (RF-T.4), a diferencia del Lambda Authorizer "OR de issuers" descartado antes (mvp.md §5).

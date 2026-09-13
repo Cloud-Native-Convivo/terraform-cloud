@@ -141,9 +141,28 @@ resource "aws_ecs_task_definition" "rabbitmq" {
 
   container_definitions = jsonencode([
     {
+      # Init container: corre como root SOLO para dejar el volumen compartido
+      # con permisos de rabbitmq (uid 999) antes de que arranque el server.
+      # Antes se intento user=0 en el contenedor de rabbitmq confiando en que
+      # el propio docker-entrypoint.sh hiciera el chown+gosu, pero ese chown
+      # no persiste en el volumen Docker-managed de Fargate -> seguia el eacces.
+      name       = "rabbitmq-init"
+      image      = "docker.io/library/busybox:1"
+      essential  = false
+      user       = "0"
+      entryPoint = ["sh", "-c"]
+      command    = ["mkdir -p /var/lib/rabbitmq && chown -R 999:999 /var/lib/rabbitmq && chmod 700 /var/lib/rabbitmq"]
+      mountPoints = [
+        { sourceVolume = "rabbitmq-data", containerPath = "/var/lib/rabbitmq" },
+      ]
+    },
+    {
       name  = "rabbitmq"
       image = "docker.io/library/rabbitmq:4-management"
-      user  = "0" # root: Fargate recorta capabilities que el entrypoint necesita para el privilege-drop a rabbitmq, causando eacces en .erlang.cookie pase lo que pase con volumen/env
+      user  = "999:999" # uid rabbitmq directo: sin gosu interno, docker-entrypoint.sh salta el privilege-drop que fallaba
+      dependsOn = [
+        { containerName = "rabbitmq-init", condition = "SUCCESS" },
+      ]
       repositoryCredentials = {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
@@ -160,6 +179,12 @@ resource "aws_ecs_task_definition" "rabbitmq" {
         # de Fargate al intentar autogenerarlo (bug conocido de la imagen
         # oficial en Fargate). Nodo único, sin clustering: no es secreto real.
         { name = "RABBITMQ_ERLANG_COOKIE", value = "convivo-rabbitmq-cookie" },
+        # Sin usuario propio, el broker corre con el "guest" default, que
+        # RabbitMQ restringe a conexiones desde localhost -- los microservicios
+        # se conectan via NLB (no localhost), asi que guest siempre da
+        # ACCESS_REFUSED. Nodo unico sin volumen persistente: no es secreto real.
+        { name = "RABBITMQ_DEFAULT_USER", value = "convivo" },
+        { name = "RABBITMQ_DEFAULT_PASS", value = "convivo-rabbitmq-pass" },
       ]
       secrets = []
       logConfiguration = {
@@ -267,6 +292,11 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "RABBITMQ_PORT", value = "5672" },
           { name = "RABBITMQ_URLS", value = "${aws_lb.internal.dns_name}:5672" },
           { name = "RABBITMQ_SSL_ENABLED", value = "false" },
+          # Debe matchear RABBITMQ_DEFAULT_USER/PASS del contenedor rabbitmq:
+          # el usuario "guest" default de RabbitMQ solo acepta login desde
+          # localhost, y estos servicios se conectan via NLB.
+          { name = "RABBITMQ_USERNAME", value = "convivo" },
+          { name = "RABBITMQ_PASSWORD", value = "convivo-rabbitmq-pass" },
           { name = "DB_HOST", value = "localhost" },
           { name = "DB_PORT", value = "1521" },
           # DB_NAME es el service name del DSN, no un nombre lógico: la imagen
