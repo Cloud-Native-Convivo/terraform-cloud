@@ -70,10 +70,11 @@ resource "aws_ecs_service" "rabbitmq" {
 }
 
 resource "aws_ecs_service" "bff" {
-  name            = "${var.project}-bff"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.bff.arn
-  desired_count   = 1
+  name                   = "${var.project}-bff"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.bff.arn
+  desired_count          = 1
+  enable_execute_command = true # diagnostico temporal del 503 en gastos-comunes
 
   network_configuration {
     subnets         = [aws_subnet.microservices.id]

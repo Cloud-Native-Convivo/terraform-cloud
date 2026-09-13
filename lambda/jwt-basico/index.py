@@ -29,15 +29,19 @@ def handler(event, _context):
 
     partes = token.split(".")
     if len(partes) != 3:
+        # DEBUG temporal: diagnostico del 401 "sesion expirada/invalida"
+        print(f"DEBUG jwt-basico: sin token o malformado, header_len={len(encabezado)}, partes={len(partes)}")
         return {"isAuthorized": False}
 
     try:
         carga = _decodificar_segmento(partes[1])
-    except Exception:
+    except Exception as exc:
+        print(f"DEBUG jwt-basico: fallo decodificando payload: {exc}")
         return {"isAuthorized": False}
 
     exp = carga.get("exp")
     if not isinstance(exp, (int, float)) or exp < time.time():
+        print(f"DEBUG jwt-basico: token expirado o sin exp, exp={exp}, ahora={time.time()}, iss={carga.get('iss')}, aud={carga.get('aud')}")
         return {"isAuthorized": False}
 
     return {"isAuthorized": True}
