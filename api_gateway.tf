@@ -134,6 +134,7 @@ resource "aws_apigatewayv2_route" "public" {
     "GET /api/health",
     "GET /api/v1/espacios-comunes",
     "GET /api/v1/espacios-comunes/espacios",
+    "GET /api/v1/espacios-comunes/espacios/{proxy+}",
   ])
 
   api_id             = aws_apigatewayv2_api.main.id

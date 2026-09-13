@@ -11,6 +11,7 @@ locals {
   entra_env = [
     { name = "ENTRA_TENANT_ID", value = var.entra_tenant_id },
     { name = "ENTRA_AUDIENCE", value = var.entra_audience },
+    { name = "ENTRA_API_CLIENT_ID", value = var.entra_audience },
     { name = "ENTRA_ISSUER", value = local.entra_issuer },
     { name = "ENTRA_JWKS_URI", value = local.entra_jwks },
   ]
@@ -297,6 +298,8 @@ resource "aws_ecs_task_definition" "domain" {
           # localhost, y estos servicios se conectan via NLB.
           { name = "RABBITMQ_USERNAME", value = "convivo" },
           { name = "RABBITMQ_PASSWORD", value = "convivo-rabbitmq-pass" },
+          { name = "RABBITMQ_USUARIO", value = "convivo" },
+          { name = "RABBITMQ_CONTRASENA", value = "convivo-rabbitmq-pass" },
           { name = "DB_HOST", value = "localhost" },
           { name = "DB_PORT", value = "1521" },
           # DB_NAME es el service name del DSN, no un nombre lógico: la imagen
