@@ -10,8 +10,9 @@ resource "random_password" "oracle_pwd" {
 }
 
 resource "aws_secretsmanager_secret" "oracle_pwd" {
-  for_each = var.domain_microservices
-  name     = "${var.project}/oracle/${each.key}"
+  for_each                = var.domain_microservices
+  name                    = "${var.project}/oracle/${each.key}"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "oracle_pwd" {
@@ -24,7 +25,8 @@ resource "aws_secretsmanager_secret_version" "oracle_pwd" {
 # el límite anónimo se agota rápido con applies/destroys repetidos ("429 Too
 # Many Requests"). Autenticado sube el límite bastante.
 resource "aws_secretsmanager_secret" "dockerhub" {
-  name = "${var.project}/dockerhub"
+  name                    = "${var.project}/dockerhub"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "dockerhub" {
