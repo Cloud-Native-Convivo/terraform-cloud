@@ -1,9 +1,11 @@
 # Infraestructura en AWS con Terraform - Convivo
 
 ## Descripción
+
 Módulo de Infraestructura como Código (IaC) desarrollado en Terraform para el aprovisionamiento de la arquitectura cloud de Convivo en Amazon Web Services (AWS), región `us-east-1`. Diseñado para ejecutarse sobre una cuenta de AWS Academy Learner Lab utilizando el rol preexistente `LabRole`.
 
 Recursos aprovisionados:
+
 - Red y Conectividad: VPC CIDR `10.0.0.0/16`, Internet Gateway, NAT Gateway en subnet pública (`10.0.1.0/24`), subnets privadas para microservicios (`10.0.2.0/24`) y bases de datos (`10.0.3.0/24`), junto con sus tablas de ruteo asociadas.
 - Seguridad Perimetral: Security Groups con reglas de ingress acotadas a la subnet de microservicios y puertos específicos de servicios.
 - Balanceo Interno: Network Load Balancer (NLB) interno con VPC Link integrado a API Gateway y Target Groups para BFF (puerto 3000), RabbitMQ (puerto 5672) y microservicios de dominio (puertos 8082 y 8083).
@@ -19,7 +21,7 @@ Recursos aprovisionados:
 ### Variables de Entrada (`variables.tf`)
 
 | Variable | Tipo | Valor por Defecto | Descripción |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `aws_region` | `string` | `"us-east-1"` | Región de AWS para el despliegue. |
 | `project` | `string` | `"convivo"` | Prefijo aplicado a nombres de recursos. |
 | `docker_hub_user` | `string` | *(requerido)* | Usuario de Docker Hub donde residen las imágenes del proyecto. |
@@ -42,7 +44,7 @@ Recursos aprovisionados:
 ### Outputs Exportados (`outputs.tf`)
 
 | Output | Tipo (inferido) | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `api_invoke_url` | `string` (inferido) | URL base de invocación de la API Gateway HTTP v2. |
 | `aws_account_id` | `string` (inferido) | ID de la cuenta AWS autenticada. |
 | `ecs_cluster_name` | `string` (inferido) | Nombre del clúster ECS aprovisionado. |
