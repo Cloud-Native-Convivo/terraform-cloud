@@ -11,9 +11,9 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = [var.frontend_admin_origin, var.frontend_residente_origin] # ambos quedan en GitHub Pages, no en AWS
+    allow_origins = ["*"]
     allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers = ["Authorization", "Content-Type"]
+    allow_headers = ["*"]
   }
 }
 
