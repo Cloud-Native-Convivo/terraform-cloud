@@ -103,21 +103,44 @@ resource "aws_apigatewayv2_integration" "bff" {
   integration_uri    = aws_lb_listener.bff.arn
 }
 
+locals {
+  # Metodos explicitos (nunca ANY): un route_key "ANY ..." tambien reclama
+  # OPTIONS, y eso apaga la respuesta automatica de preflight CORS de HTTP
+  # API (solo se auto-responde cuando NINGUNA ruta explicita matchea ese
+  # metodo+path) -- con ANY, el preflight real del navegador caeria en el
+  # authorizer CUSTOM (que exige el header Authorization) y fallaria antes
+  # de llegar al bff. Ademas, listar los verbos preserva un filtro de metodo
+  # a nivel de gateway independiente del codigo del bff (defensa en
+  # profundidad: si a RolesGuard le faltara cubrir algun verbo, el gateway
+  # ya lo rechaza).
+  bff_route_methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+  # Alineado a los controllers reales del bff (no rutas puntuales por
+  # operacion): GastosProxyController vive en /api/gastos/*path y reenvia
+  # tal cual al microservicio (de ahi el /api duplicado que arma el
+  # frontend, ver gastos-comunes.service.ts); EspaciosProxyController vive
+  # en /api/v1/espacios-comunes(/*path) y cubre tanto espacios como
+  # reservas.
+  bff_route_resources = [
+    "/api/gastos/{proxy+}",
+    "/api/v1/espacios-comunes",
+    "/api/v1/espacios-comunes/{proxy+}",
+  ]
+
+  bff_routes = toset(concat(
+    [
+      for pair in setproduct(local.bff_route_methods, local.bff_route_resources) :
+      "${pair[0]} ${pair[1]}"
+    ],
+    ["GET /api/v1/panel"],
+  ))
+}
+
 resource "aws_apigatewayv2_route" "bff" {
-  # Catch-all por dominio, alineado a los controllers reales del bff (no rutas
-  # puntuales por operacion): GastosProxyController vive en /api/gastos/*path
-  # y reenvia tal cual al microservicio (de ahi el /api duplicado que arma el
-  # frontend, ver gastos-comunes.service.ts); EspaciosProxyController vive en
-  # /api/v1/espacios-comunes(/*path) y cubre tanto espacios como reservas. El
-  # authorizer sigue siendo el mismo para todas (TD-17 cerrado) y la
-  # autorizacion por rol (admin/conserje/comite) la resuelve RolesGuard en el
-  # bff, no el gateway.
-  for_each = toset([
-    "ANY /api/gastos/{proxy+}",
-    "ANY /api/v1/espacios-comunes",
-    "ANY /api/v1/espacios-comunes/{proxy+}",
-    "GET /api/v1/panel",
-  ])
+  # El authorizer sigue siendo el mismo para todas (TD-17 cerrado) y la
+  # autorizacion por rol (admin/conserje/comite) la resuelve RolesGuard en
+  # el bff, no el gateway.
+  for_each = local.bff_routes
 
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = each.value
