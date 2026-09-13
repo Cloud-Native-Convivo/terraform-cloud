@@ -310,6 +310,12 @@ resource "aws_ecs_task_definition" "domain" {
           # Solo lo lee ms-gastos (Java/JDBC); el de espacios lo ignora.
           { name = "DB_URL", value = "jdbc:oracle:thin:@//localhost:1521/${local.oracle_pdb}" },
         ],
+        each.key == "ms-gastos-comunes" ? [
+          { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
+          { name = "MANAGEMENT_HEALTH_RABBIT_ENABLED", value = "false" },
+          { name = "CONVIVO_ENTRA_CLAIMMAP_ADMIN", value = "administrador" },
+          { name = "EUREKA_ENABLED", value = "false" },
+        ] : [],
         [for k, v in lookup(var.service_env_vars, each.key, {}) : { name = k, value = v }]
       )
       secrets = [
