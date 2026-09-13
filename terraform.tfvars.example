@@ -13,3 +13,13 @@ cognito_google_client_secret = "tu-google-client-secret"
 # Origins exactos de GitHub Pages, sin slash final (ej. https://tu-usuario.github.io/Cloud-Native).
 frontend_admin_origin     = "https://tu-usuario.github.io/nombre-repo-admin"
 frontend_residente_origin = "https://tu-usuario.github.io/nombre-repo-residente"
+
+# ms-gastos-comunes (Java/Spring Boot) configuracion recomendada para Fargate:
+service_env_vars = {
+  "ms-gastos-comunes" = {
+    MANAGEMENT_HEALTH_RABBIT_ENABLED = "false"
+    CONVIVO_ENTRA_CLAIMMAP_ADMIN     = "administrador"
+    SPRING_PROFILES_ACTIVE           = "aws"
+    EUREKA_ENABLED                   = "false"
+  }
+}
