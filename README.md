@@ -61,7 +61,9 @@ Instalar Terraform CLI y AWS CLI v2 utilizando el administrador de paquetes de W
 ```powershell
 # Instalar Terraform CLI
 winget install -e --id Hashicorp.Terraform
+```
 
+```powershell
 # Instalar AWS CLI v2
 winget install -e --id Amazon.AWSCLI
 ```
