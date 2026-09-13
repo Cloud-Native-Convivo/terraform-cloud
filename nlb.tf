@@ -38,12 +38,13 @@ resource "aws_lb_listener" "bff" {
 # tiene el BFF de resolverlos ahora que no hay Cloud Map (las IP de las tasks
 # Fargate cambian en cada deploy). Un listener por puerto sobre el mismo NLB.
 resource "aws_lb_target_group" "domain" {
-  for_each    = var.domain_microservices
-  name        = "${var.project}-tg-${each.key}"
-  port        = each.value.port
-  protocol    = "TCP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
+  for_each           = var.domain_microservices
+  name               = "${var.project}-tg-${each.key}"
+  port               = each.value.port
+  protocol           = "TCP"
+  vpc_id             = aws_vpc.main.id
+  target_type        = "ip"
+  preserve_client_ip = false
 
   health_check {
     protocol = "TCP"
@@ -66,11 +67,12 @@ resource "aws_lb_listener" "domain" {
 # RabbitMQ también se resuelve a través del NLB: Cloud Map no está disponible
 # en Learner Lab (LabRole sin permiso de Service Discovery) y las IPs de Fargate son efímeras.
 resource "aws_lb_target_group" "rabbitmq" {
-  name        = "${var.project}-tg-rabbitmq"
-  port        = 5672
-  protocol    = "TCP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
+  name               = "${var.project}-tg-rabbitmq"
+  port               = 5672
+  protocol           = "TCP"
+  vpc_id             = aws_vpc.main.id
+  target_type        = "ip"
+  preserve_client_ip = false
 
   health_check {
     protocol = "TCP"
