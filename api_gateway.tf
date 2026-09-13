@@ -113,6 +113,14 @@ resource "aws_apigatewayv2_route" "bff_proxy" {
   authorizer_id      = aws_apigatewayv2_authorizer.jwt_basico.id
 }
 
+# Preflight CORS sin autorizador: los navegadores nunca envían Bearer token en OPTIONS
+resource "aws_apigatewayv2_route" "cors_preflight" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "OPTIONS /api/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.bff.id}"
+  authorization_type = "NONE"
+}
+
 # Endpoints públicos sin autenticación:
 # 1. Healthcheck (monitoreo externo de API Gateway -> BFF)
 # 2. Catálogo público de espacios comunes (Home de productos/espacios accesible sin login)

@@ -19,6 +19,11 @@ def _decodificar_segmento(segmento: str) -> dict:
 
 
 def handler(event, _context):
+    # Preflights CORS (OPTIONS) nunca incluyen credenciales por estándar W3C
+    metodo = event.get("requestContext", {}).get("http", {}).get("method", "")
+    if metodo.upper() == "OPTIONS":
+        return {"isAuthorized": True}
+
     encabezado = event.get("headers", {}).get("authorization", "")
     token = encabezado[7:] if encabezado.lower().startswith("bearer ") else encabezado
 
