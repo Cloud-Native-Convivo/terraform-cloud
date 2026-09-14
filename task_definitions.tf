@@ -272,7 +272,7 @@ resource "aws_ecs_task_definition" "domain" {
   container_definitions = jsonencode([
     {
       name  = each.key
-      image = each.key == "ms-gastos-comunes" ? "docker.io/${var.docker_hub_user}/${each.key}:develop" : "docker.io/${var.docker_hub_user}/${each.key}:latest" # ponytail: ms-gastos-comunes main sin CI todavia, usar :latest cuando se mergee develop->main
+      image = "docker.io/${var.docker_hub_user}/${each.key}:latest" # main ya tiene CI de Docker (docker-publish.yml publica :latest en cada push)
       repositoryCredentials = {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
