@@ -96,7 +96,7 @@ resource "aws_ecs_service" "bff" {
     container_port   = 3000
   }
 
-  depends_on = [aws_ecs_service.config_server, aws_ecs_service.discovery_server, aws_lb_listener.bff]
+  depends_on = [aws_ecs_service.config_server, aws_ecs_service.discovery_server, aws_ecs_service.rabbitmq, aws_lb_listener.bff]
 }
 
 resource "aws_ecs_service" "domain" {

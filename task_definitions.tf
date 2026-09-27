@@ -237,6 +237,10 @@ resource "aws_ecs_task_definition" "bff" {
         # Default del BFF son 2s: arranque en frío de JVM/Oracle lo supera y
         # abre el circuit breaker antes de que el downstream llegue a responder.
         { name = "PROXY_TIMEOUT_MS", value = "10000" },
+        # RabbitMQ Queue-based Load Leveler
+        { name = "RABBITMQ_ENABLED", value = "true" },
+        { name = "RABBITMQ_URLS", value = "amqp://convivo:convivo-rabbitmq-pass@${aws_lb.internal.dns_name}:5672" },
+        { name = "RABBITMQ_EXCHANGE", value = "espacios_events" },
       ])
       secrets = []
       logConfiguration = {
