@@ -99,8 +99,15 @@ resource "aws_ecs_task_definition" "discovery_server" {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
       portMappings = [{ containerPort = 8761, protocol = "tcp" }]
-      environment  = []
-      secrets      = []
+      environment = [
+        { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
+        { name = "SPRING_CONFIG_IMPORT", value = "optional:configserver:http://${aws_lb.internal.dns_name}:8888" },
+        { name = "DISCOVERY_USER", value = "admin" },
+      ]
+      secrets = [
+        { name = "DISCOVERY_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+        { name = "SPRING_SECURITY_USER_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -241,8 +248,12 @@ resource "aws_ecs_task_definition" "bff" {
         { name = "RABBITMQ_ENABLED", value = "true" },
         { name = "RABBITMQ_URLS", value = "amqp://convivo:convivo-rabbitmq-pass@${aws_lb.internal.dns_name}:5672" },
         { name = "RABBITMQ_EXCHANGE", value = "espacios_events" },
+        { name = "EUREKA_USER", value = "admin" },
+        { name = "EUREKA_HOST", value = "${aws_lb.internal.dns_name}:8761" },
       ])
-      secrets = []
+      secrets = [
+        { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -316,6 +327,9 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "DB_USERNAME", value = local.oracle_env[each.key].db_user },
           # Solo lo lee ms-gastos (Java/JDBC); el de espacios lo ignora.
           { name = "DB_URL", value = "jdbc:oracle:thin:@//localhost:1521/${local.oracle_pdb}" },
+          { name = "EUREKA_USER", value = "admin" },
+          { name = "EUREKA_HOST", value = aws_lb.internal.dns_name },
+          { name = "EUREKA_PORT", value = "8761" },
         ],
         each.key == "ms-gastos-comunes" ? [
           { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
@@ -329,6 +343,7 @@ resource "aws_ecs_task_definition" "domain" {
       secrets = [
         { name = "DB_PASSWORD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
         { name = "ORACLE_PWD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
+        { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
       ]
       logConfiguration = {
         logDriver = "awslogs"

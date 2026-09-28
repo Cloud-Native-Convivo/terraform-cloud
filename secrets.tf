@@ -1,4 +1,4 @@
-# Sin jwt-secret: el MVP usa Entra ID + Cognito (RS256 + JWKS público) en vez de JWT HS256
+﻿# Sin jwt-secret: el MVP usa Entra ID + Cognito (RS256 + JWKS público) en vez de JWT HS256
 # con secreto compartido (mvp.md §3.4). Cada microservicio valida el JWT contra el JWKS
 # público del issuer correspondiente, no contra un secreto — no hay nada que guardar acá para eso.
 
@@ -35,4 +35,29 @@ resource "aws_secretsmanager_secret_version" "dockerhub" {
     username = var.docker_hub_user
     password = var.docker_hub_token
   })
+}
+
+# ---------------------------------------------------------
+# Credenciales de Discovery Server (Eureka) en Producción
+# ---------------------------------------------------------
+resource "random_password" "discovery_pwd" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "discovery" {
+  name                    = "${var.project}/discovery/password"
+  description             = "Credenciales de autenticacion basica para Eureka Discovery Server"
+  recovery_window_in_days = 0
+
+  tags = {
+    Environment = "production"
+    Service     = "discovery-server"
+    ManagedBy   = "terraform"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "discovery" {
+  secret_id     = aws_secretsmanager_secret.discovery.id
+  secret_string = random_password.discovery_pwd.result
 }
