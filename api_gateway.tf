@@ -11,7 +11,14 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["*"]
+    # Un origin CORS no admite path: las variables traen la URL de GitHub Pages
+    # con el nombre del repo, se deja solo esquema + host.
+    allow_origins = distinct([
+      regex("^https?://[^/]+", var.frontend_admin_origin),
+      regex("^https?://[^/]+", var.frontend_residente_origin),
+      "http://localhost:5173",
+      "http://localhost:4200",
+    ])
     allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     allow_headers = ["Authorization", "Content-Type", "X-Usuario-Roles", "X-Usuario-Sub", "*"]
     max_age       = 3600

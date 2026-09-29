@@ -1,0 +1,5 @@
+# AWS-0104: egress 0.0.0.0/0 en aws_security_group.microservices (security_groups.tf).
+# Aceptado: las tareas Fargate en subnet privada salen por NAT para pull de imagenes
+# (Docker Hub), Secrets Manager y JWKS de Cognito/Entra ID. Restringir requiere VPC
+# endpoints o lista de CIDRs de terceros que cambian. Revisar si se agregan endpoints.
+AWS-0104
