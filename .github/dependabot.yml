@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: terraform
+    directory: "/"
+    target-branch: develop
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: develop
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    groups:
+      actions:
+        patterns:
+          - "*"
