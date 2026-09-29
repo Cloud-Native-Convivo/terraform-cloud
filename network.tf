@@ -12,10 +12,11 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr
-  availability_zone       = var.availability_zone_a
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.public_subnet_cidr
+  availability_zone = var.availability_zone_a
+  # Solo aloja el NAT Gateway, que usa su propia EIP: nada necesita IP publica automatica (Trivy AWS-0164)
+  map_public_ip_on_launch = false
   tags                    = { Name = "${var.project}-public-subnet" }
 }
 
