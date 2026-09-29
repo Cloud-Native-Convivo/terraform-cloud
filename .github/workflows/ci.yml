@@ -113,6 +113,8 @@ jobs:
       - name: Trivy config (SARIF, CRITICAL+HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          # trivy-action v0.36.0 trae Trivy 0.70.0 por defecto; Dependabot no actualiza este valor
+          version: v0.74.0
           scan-type: config
           scan-ref: .
           severity: CRITICAL,HIGH
@@ -130,6 +132,8 @@ jobs:
       - name: Trivy config (falla en CRITICAL)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          # trivy-action v0.36.0 trae Trivy 0.70.0 por defecto; Dependabot no actualiza este valor
+          version: v0.74.0
           scan-type: config
           scan-ref: .
           severity: CRITICAL
