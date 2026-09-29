@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+# Nueva ejecucion cancela la anterior del mismo PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # providers.tf exige >= 1.7; se fija la version minima soportada
+  TF_VERSION: "1.7.5"
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
+
+jobs:
+  validate:
+    name: Terraform Validate & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Cache providers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: tf-providers-${{ runner.os }}-${{ hashFiles('.terraform.lock.hcl') }}
+
+      - name: Prepare plugin cache dir
+        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
+      - name: Check Formatting
+        run: |
+          if terraform fmt -check -recursive -diff; then
+            echo "- fmt: OK" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- fmt: FAIL (ejecutar terraform fmt -recursive)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Init (backend-less)
+        run: terraform init -backend=false
+
+      - name: Validate
+        run: |
+          if terraform validate; then
+            echo "- validate: OK" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- validate: FAIL" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Cache tflint plugins
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.tflint.d/plugins
+          key: tflint-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
+
+      - name: Init TFLint
+        run: tflint --init
+        env:
+          # Evita rate limit al descargar el plugin desde GitHub
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run TFLint
+        run: |
+          if tflint --format compact; then
+            echo "- tflint: OK" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- tflint: FAIL" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+  iac-security:
+    name: IaC Security (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Trivy config (SARIF, CRITICAL+HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          format: sarif
+          output: trivy-results.sarif
+
+      # PRs desde forks reciben token de solo lectura: la subida fallaria
+      - name: Upload SARIF
+        if: ${{ always() && github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-config
+
+      - name: Trivy config (falla en CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL
+          format: table
+          exit-code: "1"
