@@ -1,6 +1,9 @@
 version: 2
 updates:
   - package-ecosystem: terraform
+    # Espera 7 dias antes de proponer una version nueva (mitiga paquetes comprometidos recien publicados)
+    cooldown:
+      default-days: 7
     directory: "/"
     target-branch: develop
     schedule:
@@ -9,6 +12,12 @@ updates:
       - dependencies
 
   - package-ecosystem: github-actions
+
+    # Espera 7 dias antes de proponer una version nueva (mitiga paquetes comprometidos recien publicados)
+
+    cooldown:
+
+      default-days: 7
     directory: "/"
     target-branch: develop
     schedule:
