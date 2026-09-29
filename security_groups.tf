@@ -7,6 +7,7 @@ resource "aws_security_group" "microservices" {
   vpc_id      = aws_vpc.main.id
 
   egress {
+    description = "Salida via NAT: imagenes Docker Hub, Secrets Manager y JWKS de Cognito/Entra ID"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -30,6 +31,7 @@ resource "aws_security_group_rule" "microservices_self_ingress" {
   # Esa subnet es privada y solo contiene recursos nuestros (tasks ECS, ENI del
   # NLB, ENI del VPC Link), así que la CIDR no abre nada de más.
   type              = "ingress"
+  description       = "Trafico interno de la subnet de microservicios al puerto ${each.value}"
   from_port         = tonumber(each.value)
   to_port           = tonumber(each.value)
   protocol          = "tcp"
