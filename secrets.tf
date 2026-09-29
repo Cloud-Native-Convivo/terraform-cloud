@@ -1,4 +1,4 @@
-﻿# Sin jwt-secret: el MVP usa Entra ID + Cognito (RS256 + JWKS público) en vez de JWT HS256
+# Sin jwt-secret: el MVP usa Entra ID + Cognito (RS256 + JWKS público) en vez de JWT HS256
 # con secreto compartido (mvp.md §3.4). Cada microservicio valida el JWT contra el JWKS
 # público del issuer correspondiente, no contra un secreto — no hay nada que guardar acá para eso.
 
