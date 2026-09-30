@@ -46,6 +46,30 @@ resource "aws_cognito_user_pool" "residentes" {
     }
   }
 
+  # Evidencia de aceptación de Términos y Privacidad (Ley 21.719): versión aceptada y fecha
+  # ISO-8601. La SPA los escribe con UpdateUserAttributes tras el primer login con Google.
+  schema {
+    name                = "terminos_version"
+    attribute_data_type = "String"
+    mutable             = true
+    required            = false
+    string_attribute_constraints {
+      min_length = 0
+      max_length = 20
+    }
+  }
+
+  schema {
+    name                = "terminos_fecha"
+    attribute_data_type = "String"
+    mutable             = true
+    required            = false
+    string_attribute_constraints {
+      min_length = 0
+      max_length = 30
+    }
+  }
+
   password_policy {
     minimum_length    = 8
     require_lowercase = true
@@ -95,7 +119,25 @@ resource "aws_cognito_user_pool_client" "residentes" {
 
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  # aws.cognito.signin.user.admin: el access token puede llamar UpdateUserAttributes para
+  # registrar la aceptación de términos (custom:terminos_*).
+  allowed_oauth_scopes = ["openid", "email", "profile", "aws.cognito.signin.user.admin"]
+
+  # Ese scope deja al usuario editar sus propios atributos escribibles, así que la lista se
+  # restringe: atributos mapeados desde Google (Cognito exige que sean escribibles para
+  # federar) + los de términos. custom:unidad/torre/piso quedan fuera a propósito: un
+  # residente no puede cambiarse de unidad (solo AdminUpdateUserAttributes).
+  write_attributes = [
+    "email",
+    "email_verified",
+    "name",
+    "given_name",
+    "family_name",
+    "picture",
+    "locale",
+    "custom:terminos_version",
+    "custom:terminos_fecha",
+  ]
 
   # localhost incluido para poder probar el flujo en dev sin depender del deploy a GitHub Pages.
   callback_urls = ["${var.frontend_residente_origin}/auth/callback", "http://localhost:5173/auth/callback"]
