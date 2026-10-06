@@ -95,11 +95,33 @@ resource "aws_cognito_user_pool_client" "residentes" {
 
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  # aws.cognito.signin.user.admin: el front lo pide para UpdateUserAttributes (aceptación de
+  # términos, cognitoAuth.ts); sin él en esta lista Cognito rechaza el authorize.
+  allowed_oauth_scopes = ["openid", "email", "profile", "aws.cognito.signin.user.admin"]
 
   # localhost incluido para poder probar el flujo en dev sin depender del deploy a GitHub Pages.
   callback_urls = ["${var.frontend_residente_origin}/auth/callback", "http://localhost:5173/auth/callback"]
   logout_urls   = [var.frontend_residente_origin, "http://localhost:5173"]
 
   explicit_auth_flows = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+
+  # Duración de los tokens. ID y access duran poco (si se filtran, sirven por poco tiempo);
+  # el refresh token dura más y el front lo usa para pedir ID/access nuevos sin re-login
+  # (grant_type=refresh_token contra /oauth2/token, habilitado por ALLOW_REFRESH_TOKEN_AUTH).
+  id_token_validity      = 60
+  access_token_validity  = 60
+  refresh_token_validity = 7
+
+  token_validity_units {
+    id_token      = "minutes"
+    access_token  = "minutes"
+    refresh_token = "days"
+  }
+
+  # Permite invalidar el refresh token al cerrar sesión (POST /oauth2/revoke): un refresh
+  # token revocado ya no puede emitir tokens nuevos.
+  enable_token_revocation = true
+
+  # Respuestas genéricas ante usuario inexistente: no revela qué correos están registrados.
+  prevent_user_existence_errors = "ENABLED"
 }
