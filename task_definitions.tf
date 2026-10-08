@@ -188,13 +188,14 @@ resource "aws_ecs_task_definition" "rabbitmq" {
         # oficial en Fargate). Nodo único, sin clustering: no es secreto real.
         { name = "RABBITMQ_ERLANG_COOKIE", value = "convivo-rabbitmq-cookie" },
         # Sin usuario propio, el broker corre con el "guest" default, que
-        # RabbitMQ restringe a conexiones desde localhost -- los microservicios
-        # se conectan via NLB (no localhost), asi que guest siempre da
-        # ACCESS_REFUSED. Nodo unico sin volumen persistente: no es secreto real.
-        { name = "RABBITMQ_DEFAULT_USER", value = "convivo" },
-        { name = "RABBITMQ_DEFAULT_PASS", value = "convivo-rabbitmq-pass" },
+        # RabbitMQ restringe a conexiones desde localhost. Este admin solo lo
+        # usan rabbitmq-bootstrap y la UI de management: los servicios entran
+        # con su propio usuario de permisos mínimos (secrets.tf).
+        { name = "RABBITMQ_DEFAULT_USER", value = local.rabbitmq_admin_user },
       ]
-      secrets = []
+      secrets = [
+        { name = "RABBITMQ_DEFAULT_PASS", valueFrom = aws_secretsmanager_secret.rabbitmq["admin"].arn },
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -210,8 +211,56 @@ resource "aws_ecs_task_definition" "rabbitmq" {
         retries     = 3
         startPeriod = 60
       }
+    },
+    {
+      # Crea los usuarios por servicio vía API de management en cada arranque:
+      # el broker no tiene volumen persistente, así que un restart los borra
+      # junto con las colas. Mientras corre, los servicios reciben
+      # ACCESS_REFUSED y reintentan la conexión.
+      name       = "rabbitmq-bootstrap"
+      image      = "docker.io/curlimages/curl:8.11.1"
+      essential  = false
+      entryPoint = ["sh", "-c"]
+      command    = [local.rabbitmq_bootstrap_script]
+      dependsOn = [
+        { containerName = "rabbitmq", condition = "HEALTHY" },
+      ]
+      repositoryCredentials = {
+        credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
+      }
+      environment = [
+        { name = "RABBITMQ_DEFAULT_USER", value = local.rabbitmq_admin_user },
+      ]
+      secrets = concat(
+        [{ name = "RABBITMQ_DEFAULT_PASS", valueFrom = aws_secretsmanager_secret.rabbitmq["admin"].arn }],
+        [for nombre, u in local.rabbitmq_usuarios : { name = u.env, valueFrom = aws_secretsmanager_secret.rabbitmq[nombre].arn }],
+      )
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["rabbitmq"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "bootstrap"
+        }
+      }
     }
   ])
+}
+
+# Script del sidecar rabbitmq-bootstrap. Las passwords llegan como variables de
+# entorno desde Secrets Manager ($RABBITMQ_PASS_*): nunca quedan en la task
+# definition ni en el state en texto plano.
+locals {
+  rabbitmq_bootstrap_script = <<-EOT
+    set -eu
+    api() { curl -fsS --retry 20 --retry-connrefused --retry-delay 3 -u "$RABBITMQ_DEFAULT_USER:$RABBITMQ_DEFAULT_PASS" -X PUT -H 'content-type: application/json' "http://localhost:15672/api/$1" -d "$2"; }
+    %{~for nombre, u in local.rabbitmq_usuarios}
+    api 'users/${nombre}' '{"password":"'"${"$"}${u.env}"'","tags":""}'
+    api 'permissions/%2F/${nombre}' '{"configure":"${u.recursos}","write":"${u.recursos}","read":"${u.recursos}"}'
+    api 'topic-permissions/%2F/${nombre}' '{"exchange":"espacios_events","write":"${u.topic_write}","read":".*"}'
+    %{~endfor}
+    echo "rabbitmq-bootstrap: usuarios por servicio creados"
+  EOT
 }
 # mvp.md TD-11: self-hosted en Fargate, sin volumen persistente (sin EFS) — un restart/deploy
 # vacía la cola por completo. Imagen oficial de Docker Hub, no requiere build propio.
@@ -246,13 +295,14 @@ resource "aws_ecs_task_definition" "bff" {
         { name = "PROXY_TIMEOUT_MS", value = "10000" },
         # RabbitMQ Queue-based Load Leveler
         { name = "RABBITMQ_ENABLED", value = "true" },
-        { name = "RABBITMQ_URLS", value = "amqp://convivo:convivo-rabbitmq-pass@${aws_lb.internal.dns_name}:5672" },
         { name = "RABBITMQ_EXCHANGE", value = "espacios_events" },
         { name = "EUREKA_USER", value = "admin" },
         { name = "EUREKA_HOST", value = "${aws_lb.internal.dns_name}:8761" },
       ])
       secrets = [
         { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+        # URL amqp:// con usuario "bff" y su password embebidos (secrets.tf)
+        { name = "RABBITMQ_URLS", valueFrom = aws_secretsmanager_secret.rabbitmq_bff_url.arn },
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -308,13 +358,11 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "RABBITMQ_PORT", value = "5672" },
           { name = "RABBITMQ_URLS", value = "${aws_lb.internal.dns_name}:5672" },
           { name = "RABBITMQ_SSL_ENABLED", value = "false" },
-          # Debe matchear RABBITMQ_DEFAULT_USER/PASS del contenedor rabbitmq:
-          # el usuario "guest" default de RabbitMQ solo acepta login desde
-          # localhost, y estos servicios se conectan via NLB.
-          { name = "RABBITMQ_USERNAME", value = "convivo" },
-          { name = "RABBITMQ_PASSWORD", value = "convivo-rabbitmq-pass" },
-          { name = "RABBITMQ_USUARIO", value = "convivo" },
-          { name = "RABBITMQ_CONTRASENA", value = "convivo-rabbitmq-pass" },
+          # Usuario propio por servicio, creado por rabbitmq-bootstrap con
+          # permisos mínimos (secrets.tf); la password va en secrets.
+          # USERNAME/PASSWORD los lee gastos (Spring), USUARIO/CONTRASENA espacios.
+          { name = "RABBITMQ_USERNAME", value = each.key },
+          { name = "RABBITMQ_USUARIO", value = each.key },
           { name = "DB_HOST", value = "localhost" },
           { name = "DB_PORT", value = "1521" },
           # DB_NAME es el service name del DSN, no un nombre lógico: la imagen
@@ -344,6 +392,8 @@ resource "aws_ecs_task_definition" "domain" {
         { name = "DB_PASSWORD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
         { name = "ORACLE_PWD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
         { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+        { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
+        { name = "RABBITMQ_CONTRASENA", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
       ]
       logConfiguration = {
         logDriver = "awslogs"

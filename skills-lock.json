@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "refactor-module": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "c338c7e42e48b56206bbf2f7fb09396b0b5a20e0fe67441afd3552941cbd9e38"
+    },
+    "terraform-module-library": {
+      "source": "wshobson/agents",
+      "sourceType": "autoskills-registry",
+      "computedHash": "00a4d44a332c4a5e03d210a281ef8988efbbae778607f78691013bb00d03c506"
+    },
+    "terraform-stacks": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "9358da3cec1d9d524e09c2d033d81ce51c768ea1f7fc0822e8bf49c04a8d7cb4"
+    },
+    "terraform-style-guide": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "70f4304607fe5513213a2d0a948acb55335f79b24a823a9ddf1bfc7df24f0525"
+    }
+  }
+}
