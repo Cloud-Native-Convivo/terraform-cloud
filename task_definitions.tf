@@ -145,6 +145,10 @@ resource "aws_ecs_task_definition" "rabbitmq" {
   # Fargate); un volumen propio evita ese overlay y soluciona el permiso.
   volume {
     name = "rabbitmq-data"
+    efs_volume_configuration {
+      file_system_id = aws_efs_file_system.rabbitmq.id
+      root_directory = "/"
+    }
   }
 
   container_definitions = jsonencode([
@@ -334,6 +338,14 @@ resource "aws_ecs_task_definition" "domain" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
+  volume {
+    name = "oracle-data"
+    efs_volume_configuration {
+      file_system_id = aws_efs_file_system.oracle[each.key].id
+      root_directory = "/"
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name  = each.key
@@ -418,6 +430,9 @@ resource "aws_ecs_task_definition" "domain" {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
       portMappings = [{ containerPort = 1521, protocol = "tcp" }]
+      mountPoints = [
+        { sourceVolume = "oracle-data", containerPath = "/opt/oracle/oradata" },
+      ]
       # APP_USER: sin esto la imagen solo crea SYS/SYSTEM, y el usuario con el
       # que se conecta la app (espacios_user / gastos_user) no existe ->
       # ORA-01017 invalid username/password. gvenzl lo crea dentro de la PDB.
