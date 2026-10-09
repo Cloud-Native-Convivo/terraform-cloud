@@ -19,6 +19,14 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  # AGENTS.md §5: todo recurso etiquetable lleva Project y ManagedBy.
+  default_tags {
+    tags = {
+      Project   = var.project
+      ManagedBy = "Terraform"
+    }
+  }
 }
 
 data "aws_caller_identity" "current" {}

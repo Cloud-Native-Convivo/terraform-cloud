@@ -4,19 +4,23 @@ output "api_invoke_url" {
 }
 
 output "aws_account_id" {
-  value = data.aws_caller_identity.current.account_id
+  description = "ID de la cuenta AWS (Learner Lab) donde se desplegó la infraestructura."
+  value       = data.aws_caller_identity.current.account_id
 }
 
 output "ecs_cluster_name" {
-  value = aws_ecs_cluster.main.name
+  description = "Nombre del cluster ECS de Convivo."
+  value       = aws_ecs_cluster.main.name
 }
 
 output "cognito_user_pool_id" {
-  value = aws_cognito_user_pool.residentes.id
+  description = "ID del User Pool de residentes."
+  value       = aws_cognito_user_pool.residentes.id
 }
 
 output "cognito_app_client_id" {
-  value = aws_cognito_user_pool_client.residentes.id
+  description = "Client ID público del frontend residente (VITE_COGNITO_CLIENT_ID)."
+  value       = aws_cognito_user_pool_client.residentes.id
 }
 
 output "cognito_hosted_ui_domain" {
