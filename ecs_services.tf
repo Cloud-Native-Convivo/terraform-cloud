@@ -103,7 +103,7 @@ resource "aws_ecs_service" "domain" {
   name            = "${var.project}-${each.key}"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.domain[each.key].arn
-  desired_count   = 1
+  desired_count   = var.domain_desired_count
 
   network_configuration {
     subnets         = [aws_subnet.microservices.id]

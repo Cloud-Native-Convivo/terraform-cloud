@@ -123,3 +123,10 @@ variable "service_env_vars" {
   type        = map(map(string))
   default     = {}
 }
+
+variable "domain_desired_count" {
+  description = "Cantidad de tareas deseadas para microservicios de dominio (TD-06: 1 para demo en Learner Lab por presupuesto, configurable a >=2 en producción para HA)"
+  type        = number
+  default     = 1
+}
+

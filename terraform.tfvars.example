@@ -24,3 +24,8 @@ service_env_vars = {
     EUREKA_ENABLED                   = "false"
   }
 }
+
+# Cantidad de tareas deseadas para microservicios de dominio (TD-06):
+# 1 para demo en AWS Academy Learner Lab ($100 presupuesto de por vida), subir a >=2 para HA en producción.
+domain_desired_count = 1
+
