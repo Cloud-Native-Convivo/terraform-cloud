@@ -6,7 +6,7 @@ locals {
   cognito_jwks   = "${local.cognito_issuer}/.well-known/jwks.json"
 
   # Env comunes a todo microservicio de dominio + bff: permiten revalidar el JWT de CUALQUIERA
-  # de los dos issuers a nivel de servicio (defensa en profundidad, mvp.md RF-T.4), sin secreto
+  # de los dos issuers a nivel de servicio (defensa en profundidad, ERS.md RF-T.4), sin secreto
   # compartido — cada servicio decide según el issuer del token cuál JWKS usar.
   entra_env = [
     { name = "ENTRA_TENANT_ID", value = var.entra_tenant_id },
@@ -126,9 +126,9 @@ resource "aws_ecs_task_definition" "discovery_server" {
     }
   ])
 }
-# config-server y discovery-server son Java/Spring Boot fijo (mvp.md §4.13 — sin equivalente
+# config-server y discovery-server son Java/Spring Boot fijo (ERS.md §4.13 — sin equivalente
 # servidor en otro lenguaje del stack), por eso su healthCheck usa /actuator/health directo.
-# TD-12 (mvp.md) cerrado: separados también en la infraestructura real, ya no unificados.
+# TD-12 (ERS.md) cerrado: separados también en la infraestructura real, ya no unificados.
 
 resource "aws_ecs_task_definition" "rabbitmq" {
   family                   = "${var.project}-rabbitmq"
@@ -139,10 +139,10 @@ resource "aws_ecs_task_definition" "rabbitmq" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
-  # Volumen Docker-managed (no EFS, sigue efímero) montado en /var/lib/rabbitmq:
+  # Volumen persistente EFS (aws_efs_file_system.rabbitmq) montado en /var/lib/rabbitmq:
   # el overlay filesystem por defecto de Fargate da eacces al intentar
   # leer/escribir .erlang.cookie ahí (bug conocido de la imagen oficial en
-  # Fargate); un volumen propio evita ese overlay y soluciona el permiso.
+  # Fargate); un volumen propio EFS evita ese overlay y asegura persistencia.
   volume {
     name = "rabbitmq-data"
     efs_volume_configuration {
@@ -157,7 +157,7 @@ resource "aws_ecs_task_definition" "rabbitmq" {
       # con permisos de rabbitmq (uid 999) antes de que arranque el server.
       # Antes se intento user=0 en el contenedor de rabbitmq confiando en que
       # el propio docker-entrypoint.sh hiciera el chown+gosu, pero ese chown
-      # no persiste en el volumen Docker-managed de Fargate -> seguia el eacces.
+      # no persiste en el overlay de Fargate -> el volumen EFS soluciona permisos.
       name       = "rabbitmq-init"
       image      = "docker.io/library/busybox:1"
       essential  = false
@@ -266,8 +266,8 @@ locals {
     echo "rabbitmq-bootstrap: usuarios por servicio creados"
   EOT
 }
-# mvp.md TD-11: self-hosted en Fargate, sin volumen persistente (sin EFS) — un restart/deploy
-# vacía la cola por completo. Imagen oficial de Docker Hub, no requiere build propio.
+# ERS.md TD-11 resuelto: RabbitMQ self-hosted en Fargate con volumen persistente EFS (aws_efs_file_system.rabbitmq).
+# Imagen oficial de Docker Hub, no requiere build propio.
 
 resource "aws_ecs_task_definition" "bff" {
   family                   = "${var.project}-bff"
