@@ -1,5 +1,5 @@
 # Sin jwt-secret: el MVP usa Entra ID + Cognito (RS256 + JWKS público) en vez de JWT HS256
-# con secreto compartido (mvp.md §3.4). Cada microservicio valida el JWT contra el JWKS
+# con secreto compartido (ERS.md §3.4). Cada microservicio valida el JWT contra el JWKS
 # público del issuer correspondiente, no contra un secreto — no hay nada que guardar acá para eso.
 
 # Oracle passwords para sidecar DB en cada microservicio de dominio (localhost:1521)
@@ -80,7 +80,7 @@ locals {
     "ms-gastos-comunes" = {
       env         = "RABBITMQ_PASS_GASTOS"
       recursos    = "^(espacios_events|gastos[.]dlx|gastos_reserva_creada_queue|gastos_reserva_creada_dlq)$"
-      topic_write = "^gasto_fallido$"
+      topic_write = "^(gasto_fallido|reserva_pagada)$"
     }
     # El BFF hoy solo declara el exchange (assertExchange) y no publica nada:
     # topic_write "^$" le impide publicar cualquier routing key en espacios_events.
