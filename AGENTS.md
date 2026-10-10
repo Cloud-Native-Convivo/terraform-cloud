@@ -14,14 +14,14 @@ Plantilla adaptable. Al adaptarla o extenderla, sigue estas reglas — no borres
 - Comentarios explicativos del PORQUÉ de una regla son contenido, se conservan.
 - Ante la duda entre conservar o borrar: conservar, y marcar `(sin uso actual en este componente)` en vez de eliminar.
 - Sin emojis en código HCL, PR, docs generadas ni output. En commits rige Gitmoji (§11.2) por convención del proyecto.
-- Nada de solución genérica de tutorial. Cada recurso HCL responde a la arquitectura real de Convivo (ERS.md, mvp.md y despliegue-ecs-fargate.md) en AWS Academy Learner Lab (`us-east-1`).
+- Nada de solución genérica de tutorial. Cada recurso HCL responde a la arquitectura real de Convivo (ERS.md y despliegue-ecs-fargate.md) en AWS Academy Learner Lab (`us-east-1`).
 
 ## 0. Jerarquía de reglas
 
 Cuando dos reglas de este archivo entran en conflicto, se resuelven en este orden:
 
 1. Seguridad y corrección — nunca se sacrifican por ninguna otra regla (sin secretos expuestos, sin `0.0.0.0/0` innecesario).
-2. Convenciones del proyecto fijadas en `ERS.md`, `mvp.md` y `despliegue-ecs-fargate.md`.
+2. Convenciones del proyecto fijadas en `ERS.md` y `despliegue-ecs-fargate.md`.
 3. Minimalismo (sección 6, disciplina Ponytail) — se aplica solo después de satisfacer 1 y 2.
 
 ## 1. Resumen del proyecto

@@ -1,9 +1,9 @@
-# AWS Cognito: identidad exclusiva de RESIDENTE (mvp.md §1.2/§4.6). Azure Entra ID sigue
+# AWS Cognito: identidad exclusiva de RESIDENTE (ERS.md §1.2/§4.6). Azure Entra ID sigue
 # siendo el único issuer para ADMIN — no se mezclan roles en este User Pool, por eso el rol
 # se infiere del issuer del JWT (Cognito = RESIDENTE, Entra ID = ADMIN) sin necesitar grupo
 # ni atributo custom de rol acá.
 #
-# Unidad/torre/piso viven como atributos custom del propio usuario (mvp.md TD-13: sin
+# Unidad/torre/piso viven como atributos custom del propio usuario (ERS.md TD-13: sin
 # microservicio ni BD de perfil) — torre/piso opcionales (Ley 21.442, condominios Tipo B
 # sin torre/piso), la obligatoriedad de "unidad" se valida en el formulario, no en el schema.
 

@@ -1,4 +1,4 @@
-"""Lambda Authorizer liviano (mvp.md RF-T.3 / TD-17).
+"""Lambda Authorizer liviano (ERS.md RF-T.3 / TD-17).
 
 Decodifica el JWT del header Authorization sin llamar a ningun JWKS: solo
 valida que tenga tres segmentos decodificables y que `exp` no este vencido.
