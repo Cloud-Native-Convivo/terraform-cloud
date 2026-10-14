@@ -8,3 +8,5 @@ aws-credentials
 aws-credential
 *.zip
 .codegraph/
+__pycache__/
+*.pyc
