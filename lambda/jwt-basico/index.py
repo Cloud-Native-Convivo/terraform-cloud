@@ -29,19 +29,30 @@ def handler(event, _context):
 
     partes = token.split(".")
     if len(partes) != 3:
-        # DEBUG temporal: diagnostico del 401 "sesion expirada/invalida"
-        print(f"DEBUG jwt-basico: sin token o malformado, header_len={len(encabezado)}, partes={len(partes)}")
         return {"isAuthorized": False}
 
     try:
+        encabezado_jwt = _decodificar_segmento(partes[0])
         carga = _decodificar_segmento(partes[1])
-    except Exception as exc:
-        print(f"DEBUG jwt-basico: fallo decodificando payload: {exc}")
+    except Exception:
+        return {"isAuthorized": False}
+
+    # Mitigacion critica: bloqueo estricto de algoritmo 'none' o ausente (A02 / CWE-327)
+    alg = encabezado_jwt.get("alg")
+    if not isinstance(alg, str) or not alg.strip() or alg.strip().lower() == "none":
+        return {"isAuthorized": False}
+
+    # Validacion sintactica de claims minimos requeridos
+    sub = carga.get("sub")
+    iss = carga.get("iss")
+    if not isinstance(sub, str) or not sub.strip():
+        return {"isAuthorized": False}
+    if not isinstance(iss, str) or not iss.strip():
         return {"isAuthorized": False}
 
     exp = carga.get("exp")
-    if not isinstance(exp, (int, float)) or exp < time.time():
-        print(f"DEBUG jwt-basico: token expirado o sin exp, exp={exp}, ahora={time.time()}, iss={carga.get('iss')}, aud={carga.get('aud')}")
+    # Tolerancia de reloj de 30 segundos (clock skew)
+    if not isinstance(exp, (int, float)) or exp < (time.time() - 30):
         return {"isAuthorized": False}
 
     return {"isAuthorized": True}
