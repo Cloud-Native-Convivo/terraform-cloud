@@ -10,6 +10,9 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    ignore:
+      - dependency-name: "hashicorp/aws"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
 

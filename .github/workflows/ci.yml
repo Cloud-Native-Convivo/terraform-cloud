@@ -118,6 +118,7 @@ jobs:
           scan-type: config
           scan-ref: .
           severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
           format: sarif
           output: trivy-results.sarif
 
@@ -137,5 +138,6 @@ jobs:
           scan-type: config
           scan-ref: .
           severity: CRITICAL
+          trivyignores: .trivyignore
           format: table
           exit-code: "1"
