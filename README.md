@@ -98,13 +98,22 @@ cp terraform.tfvars.example terraform.tfvars
 
 Completar los valores obligatorios (`docker_hub_user`, `docker_hub_token`, `entra_tenant_id`, `entra_audience`, `cognito_google_client_id`, `cognito_google_client_secret`, `frontend_admin_origin`, `frontend_residente_origin`).
 
-### 4. Inicializar y validar
+### 4. Inicializar y Verificación Preventiva Local Pre-push
+
+Antes de abrir un Pull Request o enviar commits al repositorio remoto, ejecutar las validaciones con el runner nativo de Terraform:
 
 ```bash
-terraform init
-terraform fmt -check
+# 1. Validar formato de archivos HCL de manera recursiva
+terraform fmt -check -recursive
+
+# 2. Inicializar configuración (sin requerir backend remoto)
+terraform init -backend=false
+
+# 3. Validar sintaxis y referencias declarativas
 terraform validate
 ```
+
+> **Nota de CI**: `pr-quality.yml` valida que los títulos de PR y commits respeten la sintaxis Gitmoji + Conventional Commits (`https://gitmoji.dev/`).
 
 ### 5. Planificar y aplicar
 

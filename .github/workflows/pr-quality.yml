@@ -42,6 +42,8 @@ jobs:
             revert
           headerPattern: '^(?::\w+:|[^\w\s:]\S*)\s(\w*)(?:\(([\w$.\-*/ ]*)\))?!?:\s(.*)$'
           headerPatternCorrespondence: type, scope, subject
+          validateSingleCommit: false
+          helpURL: https://gitmoji.dev/
 
   workflow-lint:
     name: Workflow Lint
