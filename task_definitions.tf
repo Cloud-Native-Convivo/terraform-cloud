@@ -251,6 +251,48 @@ resource "aws_ecs_task_definition" "rabbitmq" {
   ])
 }
 
+resource "aws_ecs_task_definition" "mailpit" {
+  family                   = "${var.project}-mailpit"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = data.aws_iam_role.lab.arn
+  task_role_arn            = data.aws_iam_role.lab.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "mailpit"
+      image = "docker.io/axllent/mailpit:latest"
+      repositoryCredentials = {
+        credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
+      }
+      portMappings = [
+        { containerPort = 1025, protocol = "tcp" },
+        { containerPort = 8025, protocol = "tcp" },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["mailpit"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget -q --spider http://localhost:8025/api/v1/info || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 30
+      }
+    }
+  ])
+}
+# Mailpit: SMTP de prueba para la demo en AWS (SES no disponible en Academy
+# Learner Lab). Sin volumen persistente: los correos capturados se pierden
+# si el task se reinicia -- aceptable para una demo, no para produccion real.
+
 # Script del sidecar rabbitmq-bootstrap. Las passwords llegan como variables de
 # entorno desde Secrets Manager ($RABBITMQ_PASS_*): nunca quedan en la task
 # definition ni en el state en texto plano.
