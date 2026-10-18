@@ -162,5 +162,5 @@ resource "aws_ecs_service" "domain" {
     container_port   = each.value.port
   }
 
-  depends_on = [aws_ecs_service.config_server, aws_ecs_service.discovery_server, aws_ecs_service.rabbitmq, aws_lb_listener.domain]
+  depends_on = [aws_ecs_service.config_server, aws_ecs_service.discovery_server, aws_ecs_service.rabbitmq, aws_ecs_service.mailpit, aws_lb_listener.domain]
 }
