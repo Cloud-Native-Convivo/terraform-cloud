@@ -331,6 +331,7 @@ resource "aws_ecs_task_definition" "bff" {
       environment = concat(local.identity_env, [
         { name = "PORT", value = "3000" },
         { name = "NODE_ENV", value = "production" },
+        { name = "COGNITO_REGION", value = var.aws_region },
         # Sin estos el BFF cae a su default localhost:808x y el reverse proxy
         # no llega a ningún lado. El BFF les agrega el path (/api/v1/... para
         # espacios), así que acá va solo la base.
