@@ -129,7 +129,6 @@ resource "aws_cognito_user_pool_client" "residentes" {
   # residente no puede cambiarse de unidad (solo AdminUpdateUserAttributes).
   write_attributes = [
     "email",
-    "email_verified",
     "name",
     "given_name",
     "family_name",
