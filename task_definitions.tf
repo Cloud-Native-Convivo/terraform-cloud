@@ -251,6 +251,48 @@ resource "aws_ecs_task_definition" "rabbitmq" {
   ])
 }
 
+resource "aws_ecs_task_definition" "mailpit" {
+  family                   = "${var.project}-mailpit"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = data.aws_iam_role.lab.arn
+  task_role_arn            = data.aws_iam_role.lab.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "mailpit"
+      image = "docker.io/axllent/mailpit:latest"
+      repositoryCredentials = {
+        credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
+      }
+      portMappings = [
+        { containerPort = 1025, protocol = "tcp" },
+        { containerPort = 8025, protocol = "tcp" },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["mailpit"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget -q --spider http://localhost:8025/api/v1/info || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 30
+      }
+    }
+  ])
+}
+# Mailpit: SMTP de prueba para la demo en AWS (SES no disponible en Academy
+# Learner Lab). Sin volumen persistente: los correos capturados se pierden
+# si el task se reinicia -- aceptable para una demo, no para produccion real.
+
 # Script del sidecar rabbitmq-bootstrap. Las passwords llegan como variables de
 # entorno desde Secrets Manager ($RABBITMQ_PASS_*): nunca quedan en la task
 # definition ni en el state en texto plano.
@@ -289,6 +331,7 @@ resource "aws_ecs_task_definition" "bff" {
       environment = concat(local.identity_env, [
         { name = "PORT", value = "3000" },
         { name = "NODE_ENV", value = "production" },
+        { name = "COGNITO_REGION", value = var.aws_region },
         # Sin estos el BFF cae a su default localhost:808x y el reverse proxy
         # no llega a ningún lado. El BFF les agrega el path (/api/v1/... para
         # espacios), así que acá va solo la base.
@@ -397,6 +440,12 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "CONVIVO_ENTRA_CLAIMMAP_ADMIN", value = "administrador" },
           { name = "EUREKA_ENABLED", value = "false" },
           { name = "JAVA_TOOL_OPTIONS", value = "-Doracle.jdbc.timezoneAsRegion=false -Duser.timezone=UTC" },
+        ] : [],
+        each.key == "ms-espacios-comunes" ? [
+          # Mailpit se resuelve por el NLB interno, igual que RabbitMQ/Eureka
+          # (Cloud Map bloqueado en Learner Lab) -- ver aws_ecs_service.mailpit.
+          { name = "SMTP_HOST", value = aws_lb.internal.dns_name },
+          { name = "SMTP_PORT", value = "1025" },
         ] : [],
         [for k, v in lookup(var.service_env_vars, each.key, {}) : { name = k, value = v }]
       )

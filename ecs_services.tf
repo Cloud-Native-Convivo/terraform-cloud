@@ -69,6 +69,43 @@ resource "aws_ecs_service" "rabbitmq" {
   depends_on = [aws_lb_listener.rabbitmq]
 }
 
+resource "aws_ecs_service" "mailpit" {
+  name            = "${var.project}-mailpit"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.mailpit.arn
+  desired_count   = 1
+
+  network_configuration {
+    subnets         = [aws_subnet.microservices.id]
+    security_groups = [aws_security_group.microservices.id]
+  }
+
+  dynamic "capacity_provider_strategy" {
+    for_each = local.capacity_provider_strategy
+    content {
+      capacity_provider = capacity_provider_strategy.value.capacity_provider
+      weight            = capacity_provider_strategy.value.weight
+      base              = capacity_provider_strategy.value.base
+    }
+  }
+
+  # Dos target groups: 1025 (SMTP, el que realmente usa ms-espacios-comunes
+  # para enviar correo) y 8025 (bandeja web, acceso humano).
+  load_balancer {
+    target_group_arn = aws_lb_target_group.mailpit_smtp.arn
+    container_name   = "mailpit"
+    container_port   = 1025
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.mailpit.arn
+    container_name   = "mailpit"
+    container_port   = 8025
+  }
+
+  depends_on = [aws_lb_listener.mailpit_smtp, aws_lb_listener.mailpit]
+}
+
 resource "aws_ecs_service" "bff" {
   name            = "${var.project}-bff"
   cluster         = aws_ecs_cluster.main.id
@@ -125,5 +162,5 @@ resource "aws_ecs_service" "domain" {
     container_port   = each.value.port
   }
 
-  depends_on = [aws_ecs_service.config_server, aws_ecs_service.discovery_server, aws_ecs_service.rabbitmq, aws_lb_listener.domain]
+  depends_on = [aws_ecs_service.config_server, aws_ecs_service.discovery_server, aws_ecs_service.rabbitmq, aws_ecs_service.mailpit, aws_lb_listener.domain]
 }

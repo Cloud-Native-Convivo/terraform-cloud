@@ -90,3 +90,58 @@ resource "aws_lb_listener" "rabbitmq" {
     target_group_arn = aws_lb_target_group.rabbitmq.arn
   }
 }
+
+# Mailpit (correo de prueba, SES no disponible en Academy Learner Lab). SMTP
+# (1025) es el puerto funcional -- lo usa ms-espacios-comunes para enviar
+# correo, mismo motivo que RabbitMQ 5672 arriba (Cloud Map bloqueado, IPs de
+# Fargate efimeras). La bandeja web (8025) es acceso humano a los correos
+# capturados.
+resource "aws_lb_target_group" "mailpit_smtp" {
+  name               = "${var.project}-tg-mailpit-smtp"
+  port               = 1025
+  protocol           = "TCP"
+  vpc_id             = aws_vpc.main.id
+  target_type        = "ip"
+  preserve_client_ip = false
+
+  health_check {
+    protocol = "TCP"
+    port     = "1025"
+  }
+}
+
+resource "aws_lb_listener" "mailpit_smtp" {
+  load_balancer_arn = aws_lb.internal.arn
+  port              = 1025
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.mailpit_smtp.arn
+  }
+}
+
+resource "aws_lb_target_group" "mailpit" {
+  name               = "${var.project}-tg-mailpit"
+  port               = 8025
+  protocol           = "TCP"
+  vpc_id             = aws_vpc.main.id
+  target_type        = "ip"
+  preserve_client_ip = false
+
+  health_check {
+    protocol = "TCP"
+    port     = "8025"
+  }
+}
+
+resource "aws_lb_listener" "mailpit" {
+  load_balancer_arn = aws_lb.internal.arn
+  port              = 8025
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.mailpit.arn
+  }
+}
