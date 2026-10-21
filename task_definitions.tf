@@ -146,8 +146,9 @@ resource "aws_ecs_task_definition" "rabbitmq" {
   volume {
     name = "rabbitmq-data"
     efs_volume_configuration {
-      file_system_id = aws_efs_file_system.rabbitmq.id
-      root_directory = "/"
+      file_system_id     = aws_efs_file_system.rabbitmq.id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
     }
   }
 
@@ -384,8 +385,9 @@ resource "aws_ecs_task_definition" "domain" {
   volume {
     name = "oracle-data"
     efs_volume_configuration {
-      file_system_id = aws_efs_file_system.oracle[each.key].id
-      root_directory = "/"
+      file_system_id     = aws_efs_file_system.oracle[each.key].id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
     }
   }
 
