@@ -593,6 +593,9 @@ resource "aws_ecs_task_definition" "domain" {
         each.key == "ms-gastos-comunes" ? [
           { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
           { name = "MANAGEMENT_HEALTH_RABBIT_ENABLED", value = "false" },
+          # Con la credencial SMTP invalida, el indicador de mail deja /actuator/health en DOWN y
+          # ECS mata la task cada ~10 min. El correo es una notificacion, no la salud del servicio.
+          { name = "MANAGEMENT_HEALTH_MAIL_ENABLED", value = "false" },
           { name = "CONVIVO_ENTRA_CLAIMMAP_ADMIN", value = "administrador" },
           { name = "EUREKA_ENABLED", value = "false" },
           { name = "JAVA_TOOL_OPTIONS", value = "-Doracle.jdbc.timezoneAsRegion=false -Duser.timezone=UTC" },
