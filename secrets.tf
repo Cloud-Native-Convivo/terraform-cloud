@@ -137,6 +137,13 @@ locals {
       recursos    = "^(espacios_events|gastos[.]dlx|gastos[.]pdf[.]fanout|gastos_reserva_creada_queue|gastos_reserva_creada_dlq|gastos_reserva_expirada_queue|gastos_reserva_expirada_dlq|gastos_comandos_queue|gastos_pdf_generacion_queue|gastos_notificaciones_email_queue)$"
       topic_write = "^(gasto_fallido|reserva_pagada)$"
     }
+    # Outbox de ms-condominios: solo declara y publica en su propio exchange topic
+    # condominios_events (routing key = tipo de evento); no publica en espacios_events.
+    "ms-condominios" = {
+      env         = "RABBITMQ_PASS_CONDOMINIOS"
+      recursos    = "^condominios_events$"
+      topic_write = "^$"
+    }
     # El BFF declara espacios_events y el fanout gastos.pdf.fanout, y manda comandos a las
     # colas de comandos por el exchange por defecto (amq.default en los permisos). No publica
     # routing keys en espacios_events: topic_write "^$" se lo impide.

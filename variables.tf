@@ -123,6 +123,13 @@ variable "domain_microservices" {
       db_name     = "gastos_db"
       health_path = "/actuator/health"
     }
+    # Sin endpoint /health propio (el HEALTHCHECK de su Dockerfile apunta a una ruta que
+    # no existe); /docs es el mismo chequeo que usa su docker-compose.yml.
+    "ms-condominios" = {
+      port        = 8084
+      db_name     = "condominios_db"
+      health_path = "/docs"
+    }
   }
 }
 
