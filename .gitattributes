@@ -1,0 +1,3 @@
+# Los heredocs de Terraform se ejecutan con sh en Linux: un CRLF deja "set -e" y rompe el script
+*.tf text eol=lf
+*.tfvars text eol=lf
