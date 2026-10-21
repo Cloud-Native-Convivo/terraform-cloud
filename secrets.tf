@@ -61,6 +61,56 @@ resource "aws_secretsmanager_secret_version" "discovery" {
 }
 
 # ---------------------------------------------------------
+# Credenciales de Config Server (Spring Cloud Config) en Producción
+# ---------------------------------------------------------
+# application.yml del config-server (perfil "native", sin default) exige
+# CONFIG_SERVER_USER/CONFIG_SERVER_PASSWORD para basic auth o el arranque
+# aborta (PlaceholderResolutionException) -- mismo patron que discovery_pwd.
+resource "random_password" "config_server_pwd" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "config_server" {
+  name                    = "${var.project}/config-server/password"
+  description             = "Credenciales de autenticacion basica para Spring Cloud Config Server"
+  recovery_window_in_days = 0
+
+  tags = {
+    Service = "config-server"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "config_server" {
+  secret_id     = aws_secretsmanager_secret.config_server.id
+  secret_string = random_password.config_server_pwd.result
+}
+
+# application.yml del config-server exige server.ssl.enabled = true (nunca
+# desactivar en AWS, segun el comentario del propio app). El keystore PKCS12
+# lo genera el sidecar config-server-tls-init (task_definitions.tf) en el
+# volumen EFS compartido; esta password protege ese keystore.
+resource "random_password" "ssl_keystore_pwd" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "ssl_keystore" {
+  name                    = "${var.project}/config-server/ssl-keystore-password"
+  description             = "Password del keystore PKCS12 self-signed de Config Server (TLS interno)"
+  recovery_window_in_days = 0
+
+  tags = {
+    Service = "config-server"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "ssl_keystore" {
+  secret_id     = aws_secretsmanager_secret.ssl_keystore.id
+  secret_string = random_password.ssl_keystore_pwd.result
+}
+
+# ---------------------------------------------------------
 # RabbitMQ: un usuario por servicio con permisos mínimos
 # ---------------------------------------------------------
 # Antes todos compartían "convivo" con permisos totales y la password en texto
@@ -72,22 +122,34 @@ resource "aws_secretsmanager_secret_version" "discovery" {
 # Regex con [.] en vez de \. para no pelear con el escape de HCL/JSON/shell.
 locals {
   rabbitmq_usuarios = {
+    # recursos cubre configure/write/read: cada servicio declara (configure) y usa todo lo
+    # que aparece aca. Salen de las constantes de cada app (EXCHANGE_*/COLA_* en espacios,
+    # RabbitMqConfig en gastos); si una app declara un recurso nuevo, agregarlo aca o el
+    # broker responde ACCESS_REFUSED. topic_write son las routing keys que publica en
+    # espacios_events (outbox: reserva_espacio_creada, reserva_confirmada, reserva_expirada).
     "ms-espacios-comunes" = {
       env         = "RABBITMQ_PASS_ESPACIOS"
-      recursos    = "^(espacios_events|gasto_fallido|reserva_pagada)$"
-      topic_write = "^reserva_espacio_creada$"
+      recursos    = "^(espacios_events|espacios_dlx|espacios_comandos_queue|espacios_comandos_dlq|gasto_fallido|gasto_fallido_dlq|reserva_pagada|reserva_pagada_dlq|notificaciones_queue|notificaciones_dlq|reserva_pdf_queue|reserva_pdf_dlq)$"
+      topic_write = "^(reserva_espacio_creada|reserva_confirmada|reserva_expirada)$"
     }
     "ms-gastos-comunes" = {
       env         = "RABBITMQ_PASS_GASTOS"
-      recursos    = "^(espacios_events|gastos[.]dlx|gastos_reserva_creada_queue|gastos_reserva_creada_dlq)$"
+      recursos    = "^(espacios_events|gastos[.]dlx|gastos[.]pdf[.]fanout|gastos_reserva_creada_queue|gastos_reserva_creada_dlq|gastos_reserva_expirada_queue|gastos_reserva_expirada_dlq|gastos_comandos_queue|gastos_pdf_generacion_queue|gastos_notificaciones_email_queue)$"
       topic_write = "^(gasto_fallido|reserva_pagada)$"
     }
-    # El BFF hoy solo declara el exchange (assertExchange) y no publica nada:
-    # topic_write "^$" le impide publicar cualquier routing key en espacios_events.
-    # Si empieza a publicar, ampliar topic_write con lo que realmente envíe.
+    # Outbox de ms-condominios: solo declara y publica en su propio exchange topic
+    # condominios_events (routing key = tipo de evento); no publica en espacios_events.
+    "ms-condominios" = {
+      env         = "RABBITMQ_PASS_CONDOMINIOS"
+      recursos    = "^condominios_events$"
+      topic_write = "^$"
+    }
+    # El BFF declara espacios_events y el fanout gastos.pdf.fanout, y manda comandos a las
+    # colas de comandos por el exchange por defecto (amq.default en los permisos). No publica
+    # routing keys en espacios_events: topic_write "^$" se lo impide.
     "bff" = {
       env         = "RABBITMQ_PASS_BFF"
-      recursos    = "^espacios_events$"
+      recursos    = "^(espacios_events|gastos[.]pdf[.]fanout|espacios_comandos_queue|gastos_comandos_queue|amq[.]default)$"
       topic_write = "^$"
     }
   }

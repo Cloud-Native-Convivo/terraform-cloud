@@ -142,6 +142,16 @@ resource "aws_ecs_service" "domain" {
   task_definition = aws_ecs_task_definition.domain[each.key].arn
   desired_count   = var.domain_desired_count
 
+  # Oracle del sidecar es un solo escritor sobre su EFS: con el rolling default (100/200)
+  # la task nueva arranca mientras la vieja tiene abierta la base y falla con ORA-00205
+  # (control file tomado), asi que el deploy nunca termina. Parar la vieja antes de
+  # levantar la nueva cuesta un corte breve por deploy, pero el deploy converge.
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+  # ECS rechaza maximumPercent <= 100 con el rebalanceo de AZ activo (default del provider 6.x).
+  # Las tasks corren en una sola subnet, asi que el rebalanceo no tiene a donde mover nada.
+  availability_zone_rebalancing = "DISABLED"
+
   network_configuration {
     subnets         = [aws_subnet.microservices.id]
     security_groups = [aws_security_group.microservices.id]

@@ -10,3 +10,7 @@ aws-credential
 .codegraph/
 __pycache__/
 *.pyc
+
+# planes de Terraform: contienen valores sensibles
+tfplan
+*.tfplan
