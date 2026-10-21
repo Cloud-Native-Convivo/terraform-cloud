@@ -122,22 +122,27 @@ resource "aws_secretsmanager_secret_version" "ssl_keystore" {
 # Regex con [.] en vez de \. para no pelear con el escape de HCL/JSON/shell.
 locals {
   rabbitmq_usuarios = {
+    # recursos cubre configure/write/read: cada servicio declara (configure) y usa todo lo
+    # que aparece aca. Salen de las constantes de cada app (EXCHANGE_*/COLA_* en espacios,
+    # RabbitMqConfig en gastos); si una app declara un recurso nuevo, agregarlo aca o el
+    # broker responde ACCESS_REFUSED. topic_write son las routing keys que publica en
+    # espacios_events (outbox: reserva_espacio_creada, reserva_confirmada, reserva_expirada).
     "ms-espacios-comunes" = {
       env         = "RABBITMQ_PASS_ESPACIOS"
-      recursos    = "^(espacios_events|gasto_fallido|reserva_pagada)$"
-      topic_write = "^reserva_espacio_creada$"
+      recursos    = "^(espacios_events|espacios_dlx|espacios_comandos_queue|espacios_comandos_dlq|gasto_fallido|gasto_fallido_dlq|reserva_pagada|reserva_pagada_dlq|notificaciones_queue|notificaciones_dlq|reserva_pdf_queue|reserva_pdf_dlq)$"
+      topic_write = "^(reserva_espacio_creada|reserva_confirmada|reserva_expirada)$"
     }
     "ms-gastos-comunes" = {
       env         = "RABBITMQ_PASS_GASTOS"
-      recursos    = "^(espacios_events|gastos[.]dlx|gastos_reserva_creada_queue|gastos_reserva_creada_dlq)$"
+      recursos    = "^(espacios_events|gastos[.]dlx|gastos[.]pdf[.]fanout|gastos_reserva_creada_queue|gastos_reserva_creada_dlq|gastos_reserva_expirada_queue|gastos_reserva_expirada_dlq|gastos_comandos_queue|gastos_pdf_generacion_queue|gastos_notificaciones_email_queue)$"
       topic_write = "^(gasto_fallido|reserva_pagada)$"
     }
-    # El BFF hoy solo declara el exchange (assertExchange) y no publica nada:
-    # topic_write "^$" le impide publicar cualquier routing key en espacios_events.
-    # Si empieza a publicar, ampliar topic_write con lo que realmente envíe.
+    # El BFF declara espacios_events y el fanout gastos.pdf.fanout, y manda comandos a las
+    # colas de comandos por el exchange por defecto (amq.default en los permisos). No publica
+    # routing keys en espacios_events: topic_write "^$" se lo impide.
     "bff" = {
       env         = "RABBITMQ_PASS_BFF"
-      recursos    = "^espacios_events$"
+      recursos    = "^(espacios_events|gastos[.]pdf[.]fanout|espacios_comandos_queue|gastos_comandos_queue|amq[.]default)$"
       topic_write = "^$"
     }
   }
