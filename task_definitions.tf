@@ -454,6 +454,37 @@ resource "aws_ecs_task_definition" "bff" {
 }
 # BFF en NestJS 12 / TypeScript (puerto 3000, health en /health). CPU/memory subidos para Node.js.
 
+# La imagen gvenzl/oracle-free:*-faststart trae la base ya creada (control files
+# y datafiles) en /opt/oracle/oradata/FREE. Un volumen EFS vacio montado sobre
+# esa ruta oculta esos archivos y el primer arranque falla en ~10 s con
+# ORA-00205. Docker copia el contenido de la imagen al volumen la primera vez,
+# EFS no. Este contenedor monta el EFS en otra ruta y copia la base una sola vez:
+# si ya existe el control file no hace nada, asi que los datos persisten entre
+# reinicios. Si no existe, borra el dbconfig que dejo un arranque fallido y copia.
+# Una sola linea a proposito: sin heredoc no hay riesgo de CRLF en el script.
+locals {
+  oracle_seed_containers = {
+    for nombre, _ in var.domain_microservices : nombre => {
+      name                  = "oracle-seed"
+      image                 = "docker.io/gvenzl/oracle-free:23-slim-faststart"
+      essential             = false
+      user                  = "54321"
+      entryPoint            = ["sh", "-c"]
+      command               = ["[ -f /mnt/oradata/FREE/control01.ctl ] || { rm -rf /mnt/oradata/dbconfig /mnt/oradata/FREE && cp -a --no-preserve=ownership /opt/oracle/oradata/. /mnt/oradata/; }"]
+      repositoryCredentials = { credentialsParameter = aws_secretsmanager_secret.dockerhub.arn }
+      mountPoints           = [{ sourceVolume = "oracle-data", containerPath = "/mnt/oradata" }]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["oracle-${nombre}"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "seed"
+        }
+      }
+    }
+  }
+}
+
 resource "aws_ecs_task_definition" "domain" {
   for_each                 = var.domain_microservices
   family                   = "${var.project}-${each.key}"
@@ -565,12 +596,16 @@ resource "aws_ecs_task_definition" "domain" {
         startPeriod = 120
       }
     },
+    local.oracle_seed_containers[each.key],
     {
       name  = "oracle"
       image = "docker.io/gvenzl/oracle-free:23-slim-faststart"
       repositoryCredentials = {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
+      dependsOn = [
+        { containerName = "oracle-seed", condition = "SUCCESS" },
+      ]
       portMappings = [{ containerPort = 1521, protocol = "tcp" }]
       mountPoints = [
         { sourceVolume = "oracle-data", containerPath = "/opt/oracle/oradata" },
