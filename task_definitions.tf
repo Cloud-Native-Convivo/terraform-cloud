@@ -167,6 +167,23 @@ resource "aws_ecs_task_definition" "discovery_server" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
+  # Mismo keystore TLS que genera el sidecar config-server-tls-init: el access point fuerza
+  # uid 100 para cualquier cliente, asi que discovery lo lee sin sidecar propio. Si arranca
+  # antes que config-server en un ambiente nuevo, el keystore aun no existe y ECS reinicia
+  # la task hasta que aparezca.
+  volume {
+    name = "config-keystore"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.config_server_keystore.id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.config_server_keystore.id
+        iam             = "DISABLED"
+      }
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name  = "discovery-server"
@@ -176,13 +193,21 @@ resource "aws_ecs_task_definition" "discovery_server" {
       }
       portMappings = [{ containerPort = 8761, protocol = "tcp" }]
       environment = [
-        { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
+        # application.yml exige server.ssl.enabled = true (SSL_KEYSTORE_PATH sin default) y
+        # logback-spring.xml solo define appender para dev|test|default|local y prod: con
+        # el perfil "aws" solo la app no escribia ningun log y su fallo era invisible.
+        { name = "SPRING_PROFILES_ACTIVE", value = "aws,prod" },
         { name = "SPRING_CONFIG_IMPORT", value = "optional:configserver:https://${aws_lb.internal.dns_name}:8888" },
         { name = "DISCOVERY_USER", value = "admin" },
+        { name = "SSL_KEYSTORE_PATH", value = "file:/run/secrets/keystore.p12" },
       ]
       secrets = [
         { name = "DISCOVERY_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
         { name = "SPRING_SECURITY_USER_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+        { name = "SSL_KEYSTORE_PASSWORD", valueFrom = aws_secretsmanager_secret.ssl_keystore.arn },
+      ]
+      mountPoints = [
+        { sourceVolume = "config-keystore", containerPath = "/run/secrets", readOnly = true },
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -193,7 +218,8 @@ resource "aws_ecs_task_definition" "discovery_server" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+        # -k: certificado self-signed del keystore compartido, igual que config-server.
+        command     = ["CMD-SHELL", "curl -kf https://localhost:8761/actuator/health || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3
