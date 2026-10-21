@@ -61,6 +61,56 @@ resource "aws_secretsmanager_secret_version" "discovery" {
 }
 
 # ---------------------------------------------------------
+# Credenciales de Config Server (Spring Cloud Config) en Producción
+# ---------------------------------------------------------
+# application.yml del config-server (perfil "native", sin default) exige
+# CONFIG_SERVER_USER/CONFIG_SERVER_PASSWORD para basic auth o el arranque
+# aborta (PlaceholderResolutionException) -- mismo patron que discovery_pwd.
+resource "random_password" "config_server_pwd" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "config_server" {
+  name                    = "${var.project}/config-server/password"
+  description             = "Credenciales de autenticacion basica para Spring Cloud Config Server"
+  recovery_window_in_days = 0
+
+  tags = {
+    Service = "config-server"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "config_server" {
+  secret_id     = aws_secretsmanager_secret.config_server.id
+  secret_string = random_password.config_server_pwd.result
+}
+
+# application.yml del config-server exige server.ssl.enabled = true (nunca
+# desactivar en AWS, segun el comentario del propio app). El keystore PKCS12
+# lo genera el sidecar config-server-tls-init (task_definitions.tf) en el
+# volumen EFS compartido; esta password protege ese keystore.
+resource "random_password" "ssl_keystore_pwd" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "ssl_keystore" {
+  name                    = "${var.project}/config-server/ssl-keystore-password"
+  description             = "Password del keystore PKCS12 self-signed de Config Server (TLS interno)"
+  recovery_window_in_days = 0
+
+  tags = {
+    Service = "config-server"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "ssl_keystore" {
+  secret_id     = aws_secretsmanager_secret.ssl_keystore.id
+  secret_string = random_password.ssl_keystore_pwd.result
+}
+
+# ---------------------------------------------------------
 # RabbitMQ: un usuario por servicio con permisos mínimos
 # ---------------------------------------------------------
 # Antes todos compartían "convivo" con permisos totales y la password en texto
