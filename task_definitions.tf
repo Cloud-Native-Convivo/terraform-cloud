@@ -2,7 +2,13 @@ locals {
   entra_issuer = "https://login.microsoftonline.com/${var.entra_tenant_id}/v2.0"
   entra_jwks   = "https://login.microsoftonline.com/${var.entra_tenant_id}/discovery/v2.0/keys"
 
-  cognito_issuer = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.residentes.id}"
+  # El frontend desplegado emite tokens con un User Pool de otra cuenta del Learner Lab. Si se
+  # definen las variables cognito_external_*, el bff y los microservicios validan contra ese pool
+  # (su JWKS es publico, no requiere permisos entre cuentas); si no, usan el pool de esta cuenta.
+  cognito_pool_id   = var.cognito_external_user_pool_id != "" ? var.cognito_external_user_pool_id : aws_cognito_user_pool.residentes.id
+  cognito_client_id = var.cognito_external_client_id != "" ? var.cognito_external_client_id : aws_cognito_user_pool_client.residentes.id
+
+  cognito_issuer = "https://cognito-idp.${var.aws_region}.amazonaws.com/${local.cognito_pool_id}"
   cognito_jwks   = "${local.cognito_issuer}/.well-known/jwks.json"
 
   # Env comunes a todo microservicio de dominio + bff: permiten revalidar el JWT de CUALQUIERA
@@ -17,8 +23,8 @@ locals {
   ]
 
   cognito_env = [
-    { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.residentes.id },
-    { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.residentes.id },
+    { name = "COGNITO_USER_POOL_ID", value = local.cognito_pool_id },
+    { name = "COGNITO_APP_CLIENT_ID", value = local.cognito_client_id },
     { name = "COGNITO_ISSUER", value = local.cognito_issuer },
     { name = "COGNITO_JWKS_URI", value = local.cognito_jwks },
   ]

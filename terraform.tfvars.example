@@ -38,3 +38,8 @@ mail_password = "tu-app-password-de-16-letras-sin-espacios"
 # 1 para demo en AWS Academy Learner Lab ($100 presupuesto de por vida), subir a >=2 para HA en producción.
 domain_desired_count = 1
 
+
+# Opcional: validar JWT contra un User Pool de Cognito de otra cuenta (el que usa el frontend desplegado).
+# Vacio = pool de esta cuenta. Los IDs no son secretos.
+# cognito_external_user_pool_id = "us-east-1_xxxxxxxxx"
+# cognito_external_client_id    = "xxxxxxxxxxxxxxxxxxxxxxxxxx"

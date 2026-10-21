@@ -36,6 +36,18 @@ variable "cognito_google_client_id" {
   type        = string
 }
 
+variable "cognito_external_user_pool_id" {
+  description = "ID de un User Pool de Cognito de OTRA cuenta (ej. us-east-1_xxxxxxxxx) contra el que el bff y los microservicios validan el JWT. Vacio = usar el pool de esta cuenta."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_external_client_id" {
+  description = "App Client ID del User Pool externo (el que usa el frontend desplegado). Solo aplica si cognito_external_user_pool_id esta definido."
+  type        = string
+  default     = ""
+}
+
 variable "cognito_google_client_secret" {
   description = "OAuth Client Secret de la app de Google Cloud, usado como Identity Provider federado en el User Pool de Cognito (residentes)."
   type        = string
