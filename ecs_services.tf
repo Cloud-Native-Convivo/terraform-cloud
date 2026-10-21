@@ -148,6 +148,9 @@ resource "aws_ecs_service" "domain" {
   # levantar la nueva cuesta un corte breve por deploy, pero el deploy converge.
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
+  # ECS rechaza maximumPercent <= 100 con el rebalanceo de AZ activo (default del provider 6.x).
+  # Las tasks corren en una sola subnet, asi que el rebalanceo no tiene a donde mover nada.
+  availability_zone_rebalancing = "DISABLED"
 
   network_configuration {
     subnets         = [aws_subnet.microservices.id]
