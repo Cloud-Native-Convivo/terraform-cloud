@@ -123,3 +123,19 @@ resource "aws_secretsmanager_secret_version" "rabbitmq_bff_url" {
   secret_id     = aws_secretsmanager_secret.rabbitmq_bff_url.id
   secret_string = "amqp://bff:${random_password.rabbitmq["bff"].result}@${aws_lb.internal.dns_name}:5672"
 }
+
+# ---------------------------------------------------------
+# Relay SMTP (Gmail) para la notificacion por correo de
+# ms-gastos-comunes (NotificacionGastosConsumer). A diferencia de los
+# secretos de arriba, este no lo genera Terraform (random_password): es
+# una credencial externa (App Password de Gmail), viene de var.mail_password
+# -- mismo patron que docker_hub_token/cognito_google_client_secret.
+resource "aws_secretsmanager_secret" "mail_password" {
+  name                    = "${var.project}/mail/password"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "mail_password" {
+  secret_id     = aws_secretsmanager_secret.mail_password.id
+  secret_string = var.mail_password
+}

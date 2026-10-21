@@ -449,13 +449,18 @@ resource "aws_ecs_task_definition" "domain" {
         ] : [],
         [for k, v in lookup(var.service_env_vars, each.key, {}) : { name = k, value = v }]
       )
-      secrets = [
-        { name = "DB_PASSWORD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
-        { name = "ORACLE_PWD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
-        { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
-        { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
-        { name = "RABBITMQ_CONTRASENA", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
-      ]
+      secrets = concat(
+        [
+          { name = "DB_PASSWORD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
+          { name = "ORACLE_PWD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
+          { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+          { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
+          { name = "RABBITMQ_CONTRASENA", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
+        ],
+        each.key == "ms-gastos-comunes" ? [
+          { name = "MAIL_PASSWORD", valueFrom = aws_secretsmanager_secret.mail_password.arn },
+        ] : []
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
