@@ -22,8 +22,17 @@ service_env_vars = {
     CONVIVO_ENTRA_CLAIMMAP_ADMIN     = "administrador"
     SPRING_PROFILES_ACTIVE           = "aws"
     EUREKA_ENABLED                   = "false"
+    # Cuenta Gmail del relay SMTP (NotificacionGastosConsumer). No es secreta
+    # por si sola -- el App Password va aparte, en mail_password (abajo).
+    MAIL_USERNAME                    = "tu-cuenta@gmail.com"
+    MAIL_FROM                        = "tu-cuenta@gmail.com"
   }
 }
+
+# App Password de Gmail (myaccount.google.com/apppasswords, cuenta con 2FA
+# activo) para el relay SMTP de ms-gastos-comunes -- nunca la contraseña real
+# de la cuenta. Va a AWS Secrets Manager (secrets.tf), no al código.
+mail_password = "tu-app-password-de-16-letras-sin-espacios"
 
 # Cantidad de tareas deseadas para microservicios de dominio (TD-06):
 # 1 para demo en AWS Academy Learner Lab ($100 presupuesto de por vida), subir a >=2 para HA en producción.

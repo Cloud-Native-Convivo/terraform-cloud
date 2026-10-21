@@ -42,6 +42,12 @@ variable "cognito_google_client_secret" {
   sensitive   = true
 }
 
+variable "mail_password" {
+  description = "App Password de Gmail (cuenta con 2FA, generada en myaccount.google.com/apppasswords) para el relay SMTP de notificaciones de ms-gastos-comunes. No es la contraseña de la cuenta."
+  type        = string
+  sensitive   = true
+}
+
 variable "vpc_cidr" {
   description = "CIDR de la VPC de Convivo."
   type        = string
