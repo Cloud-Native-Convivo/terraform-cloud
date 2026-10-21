@@ -14,14 +14,14 @@ Plantilla adaptable. Al adaptarla o extenderla, sigue estas reglas — no borres
 - Comentarios explicativos del PORQUÉ de una regla son contenido, se conservan.
 - Ante la duda entre conservar o borrar: conservar, y marcar `(sin uso actual en este componente)` en vez de eliminar.
 - Sin emojis en código HCL, PR, docs generadas ni output. En commits rige Gitmoji (§11.2) por convención del proyecto.
-- Nada de solución genérica de tutorial. Cada recurso HCL responde a la arquitectura real de Convivo (ERS.md, mvp.md y despliegue-ecs-fargate.md) en AWS Academy Learner Lab (`us-east-1`).
+- Nada de solución genérica de tutorial. Cada recurso HCL responde a la arquitectura real de Convivo en AWS Academy Learner Lab (`us-east-1`) -- `ERS.md` y `despliegue-ecs-fargate.md` no existen en este workspace (verificado 2026-10-14).
 
 ## 0. Jerarquía de reglas
 
 Cuando dos reglas de este archivo entran en conflicto, se resuelven en este orden:
 
 1. Seguridad y corrección — nunca se sacrifican por ninguna otra regla (sin secretos expuestos, sin `0.0.0.0/0` innecesario).
-2. Convenciones del proyecto fijadas en `ERS.md`, `mvp.md` y `despliegue-ecs-fargate.md`.
+2. Convenciones del proyecto verificadas directamente contra el código HCL real (`ERS.md` y `despliegue-ecs-fargate.md` no existen en este workspace, verificado 2026-10-14).
 3. Minimalismo (sección 6, disciplina Ponytail) — se aplica solo después de satisfacer 1 y 2.
 
 ## 1. Resumen del proyecto
@@ -32,7 +32,7 @@ Entorno de ejecución objetivo: **AWS Academy Learner Lab** (cuenta sin permisos
 
 ## 2. Stack técnico
 
-- Herramienta IaC: Terraform >= 1.5.0 (usando provider AWS ~> 5.0)
+- Herramienta IaC: Terraform >= 1.7 (usando provider AWS ~> 6.66)
 - Proveedor cloud: Amazon Web Services (AWS), región `us-east-1`
 - Cómputo: AWS ECS (Fargate y Fargate Spot con capacity provider strategy)
 - Puerta de enlace: Amazon API Gateway HTTP API (v2) con Lambda Authorizer Python 3.13 (`jwt-basico`) y VPC Link
@@ -45,7 +45,7 @@ Entorno de ejecución objetivo: **AWS Academy Learner Lab** (cuenta sin permisos
 
 ```text
 terraform/
-  providers.tf          # Configuración de Terraform y provider aws (~> 5.0)
+  providers.tf          # Configuración de Terraform y provider aws (~> 6.66)
   variables.tf          # Variables de entrada con defaults y tipado estricto
   terraform.tfvars.example # Plantilla de variables para secrets y configuración local
   network.tf            # VPC, subnets (pública, microservicios, db), IGW, route tables
@@ -134,7 +134,7 @@ Checklist obligatorio antes de `terraform apply`:
 
 - **A01 Control de acceso:** Toda ruta de API Gateway redirige al BFF a través de VPC Link y está protegida por el Lambda Authorizer `jwt-basico`. El BFF valida claims de Entra ID o Cognito.
 - **A02 Configuración segura:** Security groups estrictos. Los microservicios solo aceptan tráfico del NLB y de la subnet privada de microservicios.
-- **A03 Cadena de suministro:** Version pin de providers (`hashicorp/aws` ~> 5.0) en `.terraform.lock.hcl`. Imágenes de Docker Hub autenticadas con secret token.
+- **A03 Cadena de suministro:** Version pin de providers (`hashicorp/aws` ~> 6.66) en `.terraform.lock.hcl`. Imágenes de Docker Hub autenticadas con secret token.
 - **A04 Fallos criptográficos:** Secretos gestionados en AWS Secrets Manager y referenciados en ECS mediante `valueFrom` (secret injection en container runtime).
 - **Learner Lab Constraints:** Reuso estricto de `data.aws_iam_role.lab.arn` (`LabRole`). No intentar crear roles IAM (`iam:CreateRole`) ni políticas administradas.
 

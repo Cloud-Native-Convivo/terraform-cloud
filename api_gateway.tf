@@ -1,4 +1,4 @@
-# API Gateway HTTP API con Lambda Authorizer liviano unico (mvp.md v2.2+, RF-T.3/RF-T.4,
+# API Gateway HTTP API con Lambda Authorizer liviano unico (ERS.md v2.2+, RF-T.3/RF-T.4,
 # TD-17 cerrado). Reemplaza el diseno viejo (dos JWT Authorizers nativos por issuer + rutas
 # compartidas sin ningun authorizer) que vivia antes en este archivo: un unico authorizer
 # REQUEST (`jwt-basico`, sin JWKS) valida estructura/expiracion en TODAS las rutas por igual,
@@ -71,7 +71,7 @@ data "archive_file" "jwt_basico" {
 
 resource "aws_lambda_function" "jwt_basico" {
   function_name    = "${var.project}-jwt-basico"
-  role             = data.aws_iam_role.lab.arn # LabRole: sin iam:CreateRole en Learner Lab (mvp.md §4.12)
+  role             = data.aws_iam_role.lab.arn # LabRole: sin iam:CreateRole en Learner Lab (ERS.md §4.12)
   runtime          = "python3.13"
   handler          = "index.handler"
   filename         = data.archive_file.jwt_basico.output_path
@@ -101,7 +101,7 @@ resource "aws_apigatewayv2_authorizer" "jwt_basico" {
   authorizer_result_ttl_in_seconds = 0
 }
 # No valida firma/issuer/audience/rol (RF-T.3) — esa resolucion completa vive en el bff
-# (RF-T.4), a diferencia del Lambda Authorizer "OR de issuers" descartado antes (mvp.md §5).
+# (RF-T.4), a diferencia del Lambda Authorizer "OR de issuers" descartado antes (ERS.md §5).
 
 # --- Rutas: todas via bff (reverse proxy), mismo authorizer para todas ---------------------
 

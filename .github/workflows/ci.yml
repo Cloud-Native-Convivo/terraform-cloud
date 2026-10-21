@@ -81,7 +81,7 @@ jobs:
           key: tflint-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
 
       - name: Init TFLint
         run: tflint --init
@@ -113,9 +113,12 @@ jobs:
       - name: Trivy config (SARIF, CRITICAL+HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          # trivy-action v0.36.0 trae Trivy 0.70.0 por defecto; Dependabot no actualiza este valor
+          version: v0.74.0
           scan-type: config
           scan-ref: .
           severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
           format: sarif
           output: trivy-results.sarif
 
@@ -130,8 +133,11 @@ jobs:
       - name: Trivy config (falla en CRITICAL)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          # trivy-action v0.36.0 trae Trivy 0.70.0 por defecto; Dependabot no actualiza este valor
+          version: v0.74.0
           scan-type: config
           scan-ref: .
           severity: CRITICAL
+          trivyignores: .trivyignore
           format: table
           exit-code: "1"

@@ -3,3 +3,9 @@
 # (Docker Hub), Secrets Manager y JWKS de Cognito/Entra ID. Restringir requiere VPC
 # endpoints o lista de CIDRs de terceros que cambian. Revisar si se agregan endpoints.
 AWS-0104
+
+# AWS-0098: secretos de Secrets Manager cifrados con la clave administrada aws/secretsmanager
+# (sin CMK propia) en secrets.tf. Aceptado: la clave por defecto cifra en reposo y una CMK
+# agrega costo mensual y gestion de key policy sin ganancia en este alcance. Revisar al
+# declarar CMK para el resto de la infraestructura.
+AWS-0098 exp:2027-04-30

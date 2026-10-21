@@ -18,10 +18,11 @@ resource "aws_security_group" "microservices" {
 }
 
 resource "aws_security_group_rule" "microservices_self_ingress" {
-  # bff, config-server, discovery-server, rabbitmq (AMQP + management UI) + puertos de los
-  # microservicios de dominio (dinámico vía var.domain_microservices) + Oracle sidecar (1521)
+  # bff, config-server, discovery-server, rabbitmq (AMQP + management UI),
+  # mailpit (SMTP + bandeja web) + puertos de los microservicios de dominio
+  # (dinámico vía var.domain_microservices) + Oracle sidecar (1521)
   for_each = toset(concat(
-    ["3000", "8888", "8761", "5672", "15672", "1521"],
+    ["3000", "8888", "8761", "5672", "15672", "1521", "1025", "8025"],
     [for k, v in var.domain_microservices : tostring(v.port)]
   ))
 

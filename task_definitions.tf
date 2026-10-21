@@ -6,7 +6,7 @@ locals {
   cognito_jwks   = "${local.cognito_issuer}/.well-known/jwks.json"
 
   # Env comunes a todo microservicio de dominio + bff: permiten revalidar el JWT de CUALQUIERA
-  # de los dos issuers a nivel de servicio (defensa en profundidad, mvp.md RF-T.4), sin secreto
+  # de los dos issuers a nivel de servicio (defensa en profundidad, ERS.md RF-T.4), sin secreto
   # compartido — cada servicio decide según el issuer del token cuál JWKS usar.
   entra_env = [
     { name = "ENTRA_TENANT_ID", value = var.entra_tenant_id },
@@ -126,9 +126,9 @@ resource "aws_ecs_task_definition" "discovery_server" {
     }
   ])
 }
-# config-server y discovery-server son Java/Spring Boot fijo (mvp.md §4.13 — sin equivalente
+# config-server y discovery-server son Java/Spring Boot fijo (ERS.md §4.13 — sin equivalente
 # servidor en otro lenguaje del stack), por eso su healthCheck usa /actuator/health directo.
-# TD-12 (mvp.md) cerrado: separados también en la infraestructura real, ya no unificados.
+# TD-12 (ERS.md) cerrado: separados también en la infraestructura real, ya no unificados.
 
 resource "aws_ecs_task_definition" "rabbitmq" {
   family                   = "${var.project}-rabbitmq"
@@ -139,12 +139,17 @@ resource "aws_ecs_task_definition" "rabbitmq" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
-  # Volumen Docker-managed (no EFS, sigue efímero) montado en /var/lib/rabbitmq:
+  # Volumen persistente EFS (aws_efs_file_system.rabbitmq) montado en /var/lib/rabbitmq:
   # el overlay filesystem por defecto de Fargate da eacces al intentar
   # leer/escribir .erlang.cookie ahí (bug conocido de la imagen oficial en
-  # Fargate); un volumen propio evita ese overlay y soluciona el permiso.
+  # Fargate); un volumen propio EFS evita ese overlay y asegura persistencia.
   volume {
     name = "rabbitmq-data"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.rabbitmq.id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+    }
   }
 
   container_definitions = jsonencode([
@@ -153,7 +158,7 @@ resource "aws_ecs_task_definition" "rabbitmq" {
       # con permisos de rabbitmq (uid 999) antes de que arranque el server.
       # Antes se intento user=0 en el contenedor de rabbitmq confiando en que
       # el propio docker-entrypoint.sh hiciera el chown+gosu, pero ese chown
-      # no persiste en el volumen Docker-managed de Fargate -> seguia el eacces.
+      # no persiste en el overlay de Fargate -> el volumen EFS soluciona permisos.
       name       = "rabbitmq-init"
       image      = "docker.io/library/busybox:1"
       essential  = false
@@ -188,13 +193,14 @@ resource "aws_ecs_task_definition" "rabbitmq" {
         # oficial en Fargate). Nodo único, sin clustering: no es secreto real.
         { name = "RABBITMQ_ERLANG_COOKIE", value = "convivo-rabbitmq-cookie" },
         # Sin usuario propio, el broker corre con el "guest" default, que
-        # RabbitMQ restringe a conexiones desde localhost -- los microservicios
-        # se conectan via NLB (no localhost), asi que guest siempre da
-        # ACCESS_REFUSED. Nodo unico sin volumen persistente: no es secreto real.
-        { name = "RABBITMQ_DEFAULT_USER", value = "convivo" },
-        { name = "RABBITMQ_DEFAULT_PASS", value = "convivo-rabbitmq-pass" },
+        # RabbitMQ restringe a conexiones desde localhost. Este admin solo lo
+        # usan rabbitmq-bootstrap y la UI de management: los servicios entran
+        # con su propio usuario de permisos mínimos (secrets.tf).
+        { name = "RABBITMQ_DEFAULT_USER", value = local.rabbitmq_admin_user },
       ]
-      secrets = []
+      secrets = [
+        { name = "RABBITMQ_DEFAULT_PASS", valueFrom = aws_secretsmanager_secret.rabbitmq["admin"].arn },
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -210,11 +216,101 @@ resource "aws_ecs_task_definition" "rabbitmq" {
         retries     = 3
         startPeriod = 60
       }
+    },
+    {
+      # Crea los usuarios por servicio vía API de management en cada arranque:
+      # el broker no tiene volumen persistente, así que un restart los borra
+      # junto con las colas. Mientras corre, los servicios reciben
+      # ACCESS_REFUSED y reintentan la conexión.
+      name       = "rabbitmq-bootstrap"
+      image      = "docker.io/curlimages/curl:8.11.1"
+      essential  = false
+      entryPoint = ["sh", "-c"]
+      command    = [local.rabbitmq_bootstrap_script]
+      dependsOn = [
+        { containerName = "rabbitmq", condition = "HEALTHY" },
+      ]
+      repositoryCredentials = {
+        credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
+      }
+      environment = [
+        { name = "RABBITMQ_DEFAULT_USER", value = local.rabbitmq_admin_user },
+      ]
+      secrets = concat(
+        [{ name = "RABBITMQ_DEFAULT_PASS", valueFrom = aws_secretsmanager_secret.rabbitmq["admin"].arn }],
+        [for nombre, u in local.rabbitmq_usuarios : { name = u.env, valueFrom = aws_secretsmanager_secret.rabbitmq[nombre].arn }],
+      )
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["rabbitmq"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "bootstrap"
+        }
+      }
     }
   ])
 }
-# mvp.md TD-11: self-hosted en Fargate, sin volumen persistente (sin EFS) — un restart/deploy
-# vacía la cola por completo. Imagen oficial de Docker Hub, no requiere build propio.
+
+resource "aws_ecs_task_definition" "mailpit" {
+  family                   = "${var.project}-mailpit"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = data.aws_iam_role.lab.arn
+  task_role_arn            = data.aws_iam_role.lab.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "mailpit"
+      image = "docker.io/axllent/mailpit:latest"
+      repositoryCredentials = {
+        credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
+      }
+      portMappings = [
+        { containerPort = 1025, protocol = "tcp" },
+        { containerPort = 8025, protocol = "tcp" },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["mailpit"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget -q --spider http://localhost:8025/api/v1/info || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 30
+      }
+    }
+  ])
+}
+# Mailpit: SMTP de prueba para la demo en AWS (SES no disponible en Academy
+# Learner Lab). Sin volumen persistente: los correos capturados se pierden
+# si el task se reinicia -- aceptable para una demo, no para produccion real.
+
+# Script del sidecar rabbitmq-bootstrap. Las passwords llegan como variables de
+# entorno desde Secrets Manager ($RABBITMQ_PASS_*): nunca quedan en la task
+# definition ni en el state en texto plano.
+locals {
+  rabbitmq_bootstrap_script = <<-EOT
+    set -eu
+    api() { curl -fsS --retry 20 --retry-connrefused --retry-delay 3 -u "$RABBITMQ_DEFAULT_USER:$RABBITMQ_DEFAULT_PASS" -X PUT -H 'content-type: application/json' "http://localhost:15672/api/$1" -d "$2"; }
+    %{~for nombre, u in local.rabbitmq_usuarios}
+    api 'users/${nombre}' '{"password":"'"${"$"}${u.env}"'","tags":""}'
+    api 'permissions/%2F/${nombre}' '{"configure":"${u.recursos}","write":"${u.recursos}","read":"${u.recursos}"}'
+    api 'topic-permissions/%2F/${nombre}' '{"exchange":"espacios_events","write":"${u.topic_write}","read":".*"}'
+    %{~endfor}
+    echo "rabbitmq-bootstrap: usuarios por servicio creados"
+  EOT
+}
+# ERS.md TD-11 resuelto: RabbitMQ self-hosted en Fargate con volumen persistente EFS (aws_efs_file_system.rabbitmq).
+# Imagen oficial de Docker Hub, no requiere build propio.
 
 resource "aws_ecs_task_definition" "bff" {
   family                   = "${var.project}-bff"
@@ -236,6 +332,7 @@ resource "aws_ecs_task_definition" "bff" {
       environment = concat(local.identity_env, [
         { name = "PORT", value = "3000" },
         { name = "NODE_ENV", value = "production" },
+        { name = "COGNITO_REGION", value = var.aws_region },
         # Sin estos el BFF cae a su default localhost:808x y el reverse proxy
         # no llega a ningún lado. El BFF les agrega el path (/api/v1/... para
         # espacios), así que acá va solo la base.
@@ -246,13 +343,14 @@ resource "aws_ecs_task_definition" "bff" {
         { name = "PROXY_TIMEOUT_MS", value = "10000" },
         # RabbitMQ Queue-based Load Leveler
         { name = "RABBITMQ_ENABLED", value = "true" },
-        { name = "RABBITMQ_URLS", value = "amqp://convivo:convivo-rabbitmq-pass@${aws_lb.internal.dns_name}:5672" },
         { name = "RABBITMQ_EXCHANGE", value = "espacios_events" },
         { name = "EUREKA_USER", value = "admin" },
         { name = "EUREKA_HOST", value = "${aws_lb.internal.dns_name}:8761" },
       ])
       secrets = [
         { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+        # URL amqp:// con usuario "bff" y su password embebidos (secrets.tf)
+        { name = "RABBITMQ_URLS", valueFrom = aws_secretsmanager_secret.rabbitmq_bff_url.arn },
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -284,6 +382,15 @@ resource "aws_ecs_task_definition" "domain" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
+  volume {
+    name = "oracle-data"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.oracle[each.key].id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name  = each.key
@@ -308,13 +415,11 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "RABBITMQ_PORT", value = "5672" },
           { name = "RABBITMQ_URLS", value = "${aws_lb.internal.dns_name}:5672" },
           { name = "RABBITMQ_SSL_ENABLED", value = "false" },
-          # Debe matchear RABBITMQ_DEFAULT_USER/PASS del contenedor rabbitmq:
-          # el usuario "guest" default de RabbitMQ solo acepta login desde
-          # localhost, y estos servicios se conectan via NLB.
-          { name = "RABBITMQ_USERNAME", value = "convivo" },
-          { name = "RABBITMQ_PASSWORD", value = "convivo-rabbitmq-pass" },
-          { name = "RABBITMQ_USUARIO", value = "convivo" },
-          { name = "RABBITMQ_CONTRASENA", value = "convivo-rabbitmq-pass" },
+          # Usuario propio por servicio, creado por rabbitmq-bootstrap con
+          # permisos mínimos (secrets.tf); la password va en secrets.
+          # USERNAME/PASSWORD los lee gastos (Spring), USUARIO/CONTRASENA espacios.
+          { name = "RABBITMQ_USERNAME", value = each.key },
+          { name = "RABBITMQ_USUARIO", value = each.key },
           { name = "DB_HOST", value = "localhost" },
           { name = "DB_PORT", value = "1521" },
           # DB_NAME es el service name del DSN, no un nombre lógico: la imagen
@@ -338,13 +443,26 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "EUREKA_ENABLED", value = "false" },
           { name = "JAVA_TOOL_OPTIONS", value = "-Doracle.jdbc.timezoneAsRegion=false -Duser.timezone=UTC" },
         ] : [],
+        each.key == "ms-espacios-comunes" ? [
+          # Mailpit se resuelve por el NLB interno, igual que RabbitMQ/Eureka
+          # (Cloud Map bloqueado en Learner Lab) -- ver aws_ecs_service.mailpit.
+          { name = "SMTP_HOST", value = aws_lb.internal.dns_name },
+          { name = "SMTP_PORT", value = "1025" },
+        ] : [],
         [for k, v in lookup(var.service_env_vars, each.key, {}) : { name = k, value = v }]
       )
-      secrets = [
-        { name = "DB_PASSWORD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
-        { name = "ORACLE_PWD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
-        { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
-      ]
+      secrets = concat(
+        [
+          { name = "DB_PASSWORD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
+          { name = "ORACLE_PWD", valueFrom = aws_secretsmanager_secret.oracle_pwd[each.key].arn },
+          { name = "EUREKA_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+          { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
+          { name = "RABBITMQ_CONTRASENA", valueFrom = aws_secretsmanager_secret.rabbitmq[each.key].arn },
+        ],
+        each.key == "ms-gastos-comunes" ? [
+          { name = "MAIL_PASSWORD", valueFrom = aws_secretsmanager_secret.mail_password.arn },
+        ] : []
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -368,6 +486,9 @@ resource "aws_ecs_task_definition" "domain" {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
       portMappings = [{ containerPort = 1521, protocol = "tcp" }]
+      mountPoints = [
+        { sourceVolume = "oracle-data", containerPath = "/opt/oracle/oradata" },
+      ]
       # APP_USER: sin esto la imagen solo crea SYS/SYSTEM, y el usuario con el
       # que se conecta la app (espacios_user / gastos_user) no existe ->
       # ORA-01017 invalid username/password. gvenzl lo crea dentro de la PDB.

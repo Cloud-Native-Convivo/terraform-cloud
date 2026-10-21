@@ -42,42 +42,54 @@ variable "cognito_google_client_secret" {
   sensitive   = true
 }
 
+variable "mail_password" {
+  description = "App Password de Gmail (cuenta con 2FA, generada en myaccount.google.com/apppasswords) para el relay SMTP de notificaciones de ms-gastos-comunes. No es la contraseña de la cuenta."
+  type        = string
+  sensitive   = true
+}
+
 variable "vpc_cidr" {
-  type    = string
-  default = "10.0.0.0/16"
+  description = "CIDR de la VPC de Convivo."
+  type        = string
+  default     = "10.0.0.0/16"
 }
 
 variable "public_subnet_cidr" {
-  type    = string
-  default = "10.0.1.0/24"
+  description = "CIDR de la subnet pública (NAT gateway e IGW)."
+  type        = string
+  default     = "10.0.1.0/24"
 }
 
 variable "microservices_subnet_cidr" {
-  type    = string
-  default = "10.0.2.0/24"
+  description = "CIDR de la subnet privada de microservicios (tasks ECS, NLB interno, VPC Link)."
+  type        = string
+  default     = "10.0.2.0/24"
 }
 
 variable "db_subnet_cidr" {
-  type    = string
-  default = "10.0.3.0/24"
+  description = "CIDR de la subnet privada de base de datos."
+  type        = string
+  default     = "10.0.3.0/24"
 }
 
 variable "availability_zone_a" {
-  type    = string
-  default = "us-east-1a"
+  description = "AZ de la subnet pública y la de microservicios."
+  type        = string
+  default     = "us-east-1a"
 }
 
 variable "availability_zone_b" {
-  type    = string
-  default = "us-east-1b"
+  description = "AZ secundaria, usada por la subnet de base de datos."
+  type        = string
+  default     = "us-east-1b"
 }
 
 # ponytail: single-AZ para subnet de microservicios (igual que despliegue-ecs-fargate.md) — sin HA de cómputo entre AZs.
 # Subir a multi-AZ (2da subnet privada + ECS service desplegado en ambas) si el curso pide alta disponibilidad real.
 
-# mvp.md v2.0: ms-residentes eliminado (perfil vive en atributos de Cognito/Entra ID, TD-13/TD-14).
+# ERS.md v2.0: ms-residentes eliminado (perfil vive en atributos de Cognito/Entra ID, TD-13/TD-14).
 # ms-espacios-comunes y ms-gastos-comunes son los dos microservicios de dominio de esta edición,
-# cada uno con su propia instancia RDS (database-per-service real, RF-2/RF-3).
+# cada uno con su propio Oracle Free como sidecar (database-per-service real, RF-2/RF-3).
 variable "domain_microservices" {
   description = "Microservicios de dominio activos en esta edición: puerto, nombre de BD y path del health check."
   type = map(object({
@@ -113,7 +125,14 @@ variable "frontend_residente_origin" {
 }
 
 variable "service_env_vars" {
-  description = "Variables de entorno adicionales por servicio (no secretas). TD-18: lenguaje por microservicio aún no decidido — dejar vacío hasta confirmar Java/Spring o Python/FastAPI; SPRING_* o equivalente se agrega cuando se decida."
+  description = "Variables de entorno adicionales (no secretas) por microservicio de dominio, con clave igual a la de domain_microservices. Lenguajes decididos (ERS.md TD-02): ms-espacios-comunes Python/FastAPI, ms-gastos-comunes Java/Spring Boot (SPRING_*)."
   type        = map(map(string))
   default     = {}
 }
+
+variable "domain_desired_count" {
+  description = "Cantidad de tareas deseadas para microservicios de dominio (TD-06: 1 para demo en Learner Lab por presupuesto, configurable a >=2 en producción para HA)"
+  type        = number
+  default     = 1
+}
+
