@@ -2,7 +2,13 @@ locals {
   entra_issuer = "https://login.microsoftonline.com/${var.entra_tenant_id}/v2.0"
   entra_jwks   = "https://login.microsoftonline.com/${var.entra_tenant_id}/discovery/v2.0/keys"
 
-  cognito_issuer = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.residentes.id}"
+  # El frontend desplegado emite tokens con un User Pool de otra cuenta del Learner Lab. Si se
+  # definen las variables cognito_external_*, el bff y los microservicios validan contra ese pool
+  # (su JWKS es publico, no requiere permisos entre cuentas); si no, usan el pool de esta cuenta.
+  cognito_pool_id   = var.cognito_external_user_pool_id != "" ? var.cognito_external_user_pool_id : aws_cognito_user_pool.residentes.id
+  cognito_client_id = var.cognito_external_client_id != "" ? var.cognito_external_client_id : aws_cognito_user_pool_client.residentes.id
+
+  cognito_issuer = "https://cognito-idp.${var.aws_region}.amazonaws.com/${local.cognito_pool_id}"
   cognito_jwks   = "${local.cognito_issuer}/.well-known/jwks.json"
 
   # Env comunes a todo microservicio de dominio + bff: permiten revalidar el JWT de CUALQUIERA
@@ -17,8 +23,8 @@ locals {
   ]
 
   cognito_env = [
-    { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.residentes.id },
-    { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.residentes.id },
+    { name = "COGNITO_USER_POOL_ID", value = local.cognito_pool_id },
+    { name = "COGNITO_APP_CLIENT_ID", value = local.cognito_client_id },
     { name = "COGNITO_ISSUER", value = local.cognito_issuer },
     { name = "COGNITO_JWKS_URI", value = local.cognito_jwks },
   ]
@@ -39,6 +45,10 @@ locals {
       db_name = "gastos_db"
       db_user = "gastos_user"
     }
+    "ms-condominios" = {
+      db_name = "condominios_db"
+      db_user = "condominios_user"
+    }
   }
 }
 
@@ -53,16 +63,84 @@ resource "aws_ecs_task_definition" "config_server" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
+  volume {
+    name = "config-keystore"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.config_server_keystore.id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.config_server_keystore.id
+        iam             = "DISABLED"
+      }
+    }
+  }
+
   container_definitions = jsonencode([
+    {
+      # application.yml exige server.ssl.enabled = true y un keystore PKCS12
+      # en SSL_KEYSTORE_PATH (sin default: "nunca activar sin TLS en AWS").
+      # Reusa la misma imagen del config-server (ya tiene keytool via su JRE
+      # base) solo para generar el keystore self-signed una vez en el volumen
+      # EFS compartido -- mismo patron que rabbitmq-init/rabbitmq-bootstrap.
+      name  = "config-server-tls-init"
+      image = "docker.io/${var.docker_hub_user}/config-server-cloud:latest"
+      repositoryCredentials = {
+        credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
+      }
+      essential  = false
+      entryPoint = ["sh", "-c"]
+      # replace(...,"\r","") -- el archivo .tf tiene CRLF (Windows); sin esto,
+      # el heredoc deja \r embebidos en el string y ash lo lee como
+      # "set -e\r" -> "illegal option -" (nunca llega a ejecutar el script).
+      command = [
+        replace(<<-EOT
+        set -e
+        if [ ! -f /run/secrets/keystore.p12 ]; then
+          keytool -genkeypair -alias config-server -keyalg RSA -keysize 2048 -validity 3650 \
+            -keystore /run/secrets/keystore.p12 -storetype PKCS12 \
+            -storepass "$SSL_KEYSTORE_PASSWORD" -keypass "$SSL_KEYSTORE_PASSWORD" \
+            -dname "CN=convivo-config-server,OU=Convivo,O=Convivo,L=Santiago,ST=RM,C=CL"
+        fi
+        EOT
+        , "\r", "")
+      ]
+      secrets = [
+        { name = "SSL_KEYSTORE_PASSWORD", valueFrom = aws_secretsmanager_secret.ssl_keystore.arn },
+      ]
+      mountPoints = [
+        { sourceVolume = "config-keystore", containerPath = "/run/secrets" },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["config-server"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "tls-init"
+        }
+      }
+    },
     {
       name  = "config-server"
       image = "docker.io/${var.docker_hub_user}/config-server-cloud:latest"
       repositoryCredentials = {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
+      dependsOn = [
+        { containerName = "config-server-tls-init", condition = "SUCCESS" },
+      ]
       portMappings = [{ containerPort = 8888, protocol = "tcp" }]
-      environment  = []
-      secrets      = []
+      environment = [
+        { name = "CONFIG_SERVER_USER", value = "admin" },
+        { name = "SSL_KEYSTORE_PATH", value = "file:/run/secrets/keystore.p12" },
+      ]
+      secrets = [
+        { name = "CONFIG_SERVER_PASSWORD", valueFrom = aws_secretsmanager_secret.config_server.arn },
+        { name = "SSL_KEYSTORE_PASSWORD", valueFrom = aws_secretsmanager_secret.ssl_keystore.arn },
+      ]
+      mountPoints = [
+        { sourceVolume = "config-keystore", containerPath = "/run/secrets" },
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -72,7 +150,9 @@ resource "aws_ecs_task_definition" "config_server" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1"]
+        # -k: certificado self-signed, igual que el HEALTHCHECK del propio
+        # Dockerfile de config-server-cloud ("curl -fsk https://...").
+        command     = ["CMD-SHELL", "curl -kf https://localhost:8888/actuator/health || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3
@@ -91,6 +171,23 @@ resource "aws_ecs_task_definition" "discovery_server" {
   execution_role_arn       = data.aws_iam_role.lab.arn
   task_role_arn            = data.aws_iam_role.lab.arn
 
+  # Mismo keystore TLS que genera el sidecar config-server-tls-init: el access point fuerza
+  # uid 100 para cualquier cliente, asi que discovery lo lee sin sidecar propio. Si arranca
+  # antes que config-server en un ambiente nuevo, el keystore aun no existe y ECS reinicia
+  # la task hasta que aparezca.
+  volume {
+    name = "config-keystore"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.config_server_keystore.id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.config_server_keystore.id
+        iam             = "DISABLED"
+      }
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name  = "discovery-server"
@@ -100,13 +197,21 @@ resource "aws_ecs_task_definition" "discovery_server" {
       }
       portMappings = [{ containerPort = 8761, protocol = "tcp" }]
       environment = [
-        { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
-        { name = "SPRING_CONFIG_IMPORT", value = "optional:configserver:http://${aws_lb.internal.dns_name}:8888" },
+        # application.yml exige server.ssl.enabled = true (SSL_KEYSTORE_PATH sin default) y
+        # logback-spring.xml solo define appender para dev|test|default|local y prod: con
+        # el perfil "aws" solo la app no escribia ningun log y su fallo era invisible.
+        { name = "SPRING_PROFILES_ACTIVE", value = "aws,prod" },
+        { name = "SPRING_CONFIG_IMPORT", value = "optional:configserver:https://${aws_lb.internal.dns_name}:8888" },
         { name = "DISCOVERY_USER", value = "admin" },
+        { name = "SSL_KEYSTORE_PATH", value = "file:/run/secrets/keystore.p12" },
       ]
       secrets = [
         { name = "DISCOVERY_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
         { name = "SPRING_SECURITY_USER_PASSWORD", valueFrom = aws_secretsmanager_secret.discovery.arn },
+        { name = "SSL_KEYSTORE_PASSWORD", valueFrom = aws_secretsmanager_secret.ssl_keystore.arn },
+      ]
+      mountPoints = [
+        { sourceVolume = "config-keystore", containerPath = "/run/secrets", readOnly = true },
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -117,7 +222,8 @@ resource "aws_ecs_task_definition" "discovery_server" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+        # -k: certificado self-signed del keystore compartido, igual que config-server.
+        command     = ["CMD-SHELL", "curl -kf https://localhost:8761/actuator/health || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3
@@ -298,9 +404,20 @@ resource "aws_ecs_task_definition" "mailpit" {
 # entorno desde Secrets Manager ($RABBITMQ_PASS_*): nunca quedan en la task
 # definition ni en el state en texto plano.
 locals {
-  rabbitmq_bootstrap_script = <<-EOT
+  # replace(...,"\r","") -- el archivo .tf tiene CRLF (Windows); sin esto,
+  # el heredoc deja \r embebidos en el string y ash lo lee como "set -eu\r"
+  # -> "illegal option -" (el sidecar nunca llega a crear los usuarios, y
+  # bff queda en loop de "PLAIN login refused" contra RabbitMQ).
+  rabbitmq_bootstrap_script = replace(<<-EOT
     set -eu
     api() { curl -fsS --retry 20 --retry-connrefused --retry-delay 3 -u "$RABBITMQ_DEFAULT_USER:$RABBITMQ_DEFAULT_PASS" -X PUT -H 'content-type: application/json' "http://localhost:15672/api/$1" -d "$2"; }
+    # Sin esto, las topic-permissions de abajo dan 400 "no_such_exchange":
+    # el exchange lo declara el BFF (messaging.service.ts, assertExchange)
+    # recien al conectarse, pero no puede conectarse sin permisos, y los
+    # permisos de topic no se pueden setear sobre un exchange que no existe
+    # todavia -- dependencia circular. Se declara aca, idempotente, con el
+    # mismo tipo/durable que usa el BFF.
+    api 'exchanges/%2F/espacios_events' '{"type":"topic","durable":true}'
     %{~for nombre, u in local.rabbitmq_usuarios}
     api 'users/${nombre}' '{"password":"'"${"$"}${u.env}"'","tags":""}'
     api 'permissions/%2F/${nombre}' '{"configure":"${u.recursos}","write":"${u.recursos}","read":"${u.recursos}"}'
@@ -308,6 +425,7 @@ locals {
     %{~endfor}
     echo "rabbitmq-bootstrap: usuarios por servicio creados"
   EOT
+  , "\r", "")
 }
 # ERS.md TD-11 resuelto: RabbitMQ self-hosted en Fargate con volumen persistente EFS (aws_efs_file_system.rabbitmq).
 # Imagen oficial de Docker Hub, no requiere build propio.
@@ -338,6 +456,7 @@ resource "aws_ecs_task_definition" "bff" {
         # espacios), así que acá va solo la base.
         { name = "ESPACIOS_COMUNES_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-espacios-comunes"].port}" },
         { name = "GASTOS_COMUNES_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-gastos-comunes"].port}" },
+        { name = "CONDOMINIOS_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-condominios"].port}" },
         # Default del BFF son 2s: arranque en frío de JVM/Oracle lo supera y
         # abre el circuit breaker antes de que el downstream llegue a responder.
         { name = "PROXY_TIMEOUT_MS", value = "10000" },
@@ -372,6 +491,37 @@ resource "aws_ecs_task_definition" "bff" {
 }
 # BFF en NestJS 12 / TypeScript (puerto 3000, health en /health). CPU/memory subidos para Node.js.
 
+# La imagen gvenzl/oracle-free:*-faststart trae la base ya creada (control files
+# y datafiles) en /opt/oracle/oradata/FREE. Un volumen EFS vacio montado sobre
+# esa ruta oculta esos archivos y el primer arranque falla en ~10 s con
+# ORA-00205. Docker copia el contenido de la imagen al volumen la primera vez,
+# EFS no. Este contenedor monta el EFS en otra ruta y copia la base una sola vez:
+# si ya existe el control file no hace nada, asi que los datos persisten entre
+# reinicios. Si no existe, borra el dbconfig que dejo un arranque fallido y copia.
+# Una sola linea a proposito: sin heredoc no hay riesgo de CRLF en el script.
+locals {
+  oracle_seed_containers = {
+    for nombre, _ in var.domain_microservices : nombre => {
+      name                  = "oracle-seed"
+      image                 = "docker.io/gvenzl/oracle-free:23-slim-faststart"
+      essential             = false
+      user                  = "54321"
+      entryPoint            = ["sh", "-c"]
+      command               = ["[ -f /mnt/oradata/FREE/control01.ctl ] || { rm -rf /mnt/oradata/dbconfig /mnt/oradata/FREE && cp -a --no-preserve=ownership /opt/oracle/oradata/. /mnt/oradata/; }"]
+      repositoryCredentials = { credentialsParameter = aws_secretsmanager_secret.dockerhub.arn }
+      mountPoints           = [{ sourceVolume = "oracle-data", containerPath = "/mnt/oradata" }]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.service["oracle-${nombre}"].name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "seed"
+        }
+      }
+    }
+  }
+}
+
 resource "aws_ecs_task_definition" "domain" {
   for_each                 = var.domain_microservices
   family                   = "${var.project}-${each.key}"
@@ -388,6 +538,10 @@ resource "aws_ecs_task_definition" "domain" {
       file_system_id     = aws_efs_file_system.oracle[each.key].id
       root_directory     = "/"
       transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.oracle[each.key].id
+        iam             = "DISABLED"
+      }
     }
   }
 
@@ -439,6 +593,9 @@ resource "aws_ecs_task_definition" "domain" {
         each.key == "ms-gastos-comunes" ? [
           { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
           { name = "MANAGEMENT_HEALTH_RABBIT_ENABLED", value = "false" },
+          # Con la credencial SMTP invalida, el indicador de mail deja /actuator/health en DOWN y
+          # ECS mata la task cada ~10 min. El correo es una notificacion, no la salud del servicio.
+          { name = "MANAGEMENT_HEALTH_MAIL_ENABLED", value = "false" },
           { name = "CONVIVO_ENTRA_CLAIMMAP_ADMIN", value = "administrador" },
           { name = "EUREKA_ENABLED", value = "false" },
           { name = "JAVA_TOOL_OPTIONS", value = "-Doracle.jdbc.timezoneAsRegion=false -Duser.timezone=UTC" },
@@ -479,12 +636,16 @@ resource "aws_ecs_task_definition" "domain" {
         startPeriod = 120
       }
     },
+    local.oracle_seed_containers[each.key],
     {
       name  = "oracle"
       image = "docker.io/gvenzl/oracle-free:23-slim-faststart"
       repositoryCredentials = {
         credentialsParameter = aws_secretsmanager_secret.dockerhub.arn
       }
+      dependsOn = [
+        { containerName = "oracle-seed", condition = "SUCCESS" },
+      ]
       portMappings = [{ containerPort = 1521, protocol = "tcp" }]
       mountPoints = [
         { sourceVolume = "oracle-data", containerPath = "/opt/oracle/oradata" },

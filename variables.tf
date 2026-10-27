@@ -36,6 +36,18 @@ variable "cognito_google_client_id" {
   type        = string
 }
 
+variable "cognito_external_user_pool_id" {
+  description = "ID de un User Pool de Cognito de OTRA cuenta (ej. us-east-1_xxxxxxxxx) contra el que el bff y los microservicios validan el JWT. Vacio = usar el pool de esta cuenta."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_external_client_id" {
+  description = "App Client ID del User Pool externo (el que usa el frontend desplegado). Solo aplica si cognito_external_user_pool_id esta definido."
+  type        = string
+  default     = ""
+}
+
 variable "cognito_google_client_secret" {
   description = "OAuth Client Secret de la app de Google Cloud, usado como Identity Provider federado en el User Pool de Cognito (residentes)."
   type        = string
@@ -110,6 +122,13 @@ variable "domain_microservices" {
       port        = 8083
       db_name     = "gastos_db"
       health_path = "/actuator/health"
+    }
+    # Sin endpoint /health propio (el HEALTHCHECK de su Dockerfile apunta a una ruta que
+    # no existe); /docs es el mismo chequeo que usa su docker-compose.yml.
+    "ms-condominios" = {
+      port        = 8084
+      db_name     = "condominios_db"
+      health_path = "/docs"
     }
   }
 }
