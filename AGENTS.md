@@ -14,14 +14,14 @@ Plantilla adaptable. Al adaptarla o extenderla, sigue estas reglas — no borres
 - Comentarios explicativos del PORQUÉ de una regla son contenido, se conservan.
 - Ante la duda entre conservar o borrar: conservar, y marcar `(sin uso actual en este componente)` en vez de eliminar.
 - Sin emojis en código HCL, PR, docs generadas ni output. En commits rige Gitmoji (§11.2) por convención del proyecto.
-- Nada de solución genérica de tutorial. Cada recurso HCL responde a la arquitectura real de Convivo en AWS Academy Learner Lab (`us-east-1`) -- `ERS.md` y `despliegue-ecs-fargate.md` no existen en este workspace (verificado 2026-10-14).
+- Nada de solución genérica de tutorial. Cada recurso HCL responde a la arquitectura real de Convivo en AWS Academy Learner Lab (`us-east-1`) y a la arquitectura de referencia del proyecto.
 
 ## 0. Jerarquía de reglas
 
 Cuando dos reglas de este archivo entran en conflicto, se resuelven en este orden:
 
 1. Seguridad y corrección — nunca se sacrifican por ninguna otra regla (sin secretos expuestos, sin `0.0.0.0/0` innecesario).
-2. Convenciones del proyecto verificadas directamente contra el código HCL real (`ERS.md` y `despliegue-ecs-fargate.md` no existen en este workspace, verificado 2026-10-14).
+2. Convenciones del proyecto verificadas contra el código HCL real.
 3. Minimalismo (sección 6, disciplina Ponytail) — se aplica solo después de satisfacer 1 y 2.
 
 ## 1. Resumen del proyecto
@@ -171,9 +171,9 @@ terraform plan -var-file=terraform.tfvars -out=tfplan
 terraform apply tfplan
 ```
 
-Para actualizar los contenedores en ECS sin destruir la infraestructura, usar el script raíz:
-```powershell
-.\deploy-ecs.ps1 -All
+Para actualizar un contenedor en ECS sin destruir la infraestructura, usar AWS CLI con credenciales vigentes y el servicio correspondiente:
+```bash
+aws ecs update-service --cluster convivo-cluster --service convivo-bff --force-new-deployment --region us-east-1
 ```
 
 ## 14. Relación en el Workspace
