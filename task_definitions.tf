@@ -12,7 +12,7 @@ locals {
   cognito_jwks   = "${local.cognito_issuer}/.well-known/jwks.json"
 
   # Env comunes a todo microservicio de dominio + bff: permiten revalidar el JWT de CUALQUIERA
-  # de los dos issuers a nivel de servicio (defensa en profundidad, ERS.md RF-T.4), sin secreto
+  # de los dos issuers a nivel de servicio (defensa en profundidad, RF-T.4), sin secreto
   # compartido — cada servicio decide según el issuer del token cuál JWKS usar.
   entra_env = [
     { name = "ENTRA_TENANT_ID", value = var.entra_tenant_id },
@@ -232,9 +232,9 @@ resource "aws_ecs_task_definition" "discovery_server" {
     }
   ])
 }
-# config-server y discovery-server son Java/Spring Boot fijo (ERS.md §4.13 — sin equivalente
+# config-server y discovery-server son Java/Spring Boot fijo (sin equivalente
 # servidor en otro lenguaje del stack), por eso su healthCheck usa /actuator/health directo.
-# TD-12 (ERS.md) cerrado: separados también en la infraestructura real, ya no unificados.
+# TD-12 cerrado: separados también en la infraestructura real, ya no unificados.
 
 resource "aws_ecs_task_definition" "rabbitmq" {
   family                   = "${var.project}-rabbitmq"

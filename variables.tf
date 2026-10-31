@@ -1,5 +1,5 @@
 variable "aws_region" {
-  description = "Región AWS. ERS.md/despliegue-ecs-fargate.md usan us-east-1."
+  description = "Región AWS usada por la arquitectura del proyecto."
   type        = string
   default     = "us-east-1"
 }
@@ -96,10 +96,10 @@ variable "availability_zone_b" {
   default     = "us-east-1b"
 }
 
-# ponytail: single-AZ para subnet de microservicios (igual que despliegue-ecs-fargate.md) — sin HA de cómputo entre AZs.
+# ponytail: single-AZ para subnet de microservicios — sin HA de cómputo entre AZs.
 # Subir a multi-AZ (2da subnet privada + ECS service desplegado en ambas) si el curso pide alta disponibilidad real.
 
-# ERS.md v2.0: ms-residentes eliminado (perfil vive en atributos de Cognito/Entra ID, TD-13/TD-14).
+# ms-residentes eliminado (perfil vive en atributos de Cognito/Entra ID, TD-13/TD-14).
 # ms-espacios-comunes y ms-gastos-comunes son los dos microservicios de dominio de esta edición,
 # cada uno con su propio Oracle Free como sidecar (database-per-service real, RF-2/RF-3).
 variable "domain_microservices" {
@@ -144,7 +144,7 @@ variable "frontend_residente_origin" {
 }
 
 variable "service_env_vars" {
-  description = "Variables de entorno adicionales (no secretas) por microservicio de dominio, con clave igual a la de domain_microservices. Lenguajes decididos (ERS.md TD-02): ms-espacios-comunes Python/FastAPI, ms-gastos-comunes Java/Spring Boot (SPRING_*)."
+  description = "Variables de entorno adicionales (no secretas) por microservicio de dominio, con clave igual a la de domain_microservices. Lenguajes decididos (TD-02): ms-espacios-comunes Python/FastAPI, ms-gastos-comunes Java/Spring Boot (SPRING_*)."
   type        = map(map(string))
   default     = {}
 }

@@ -31,5 +31,5 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 resource "aws_cloudwatch_log_group" "service" {
   for_each          = toset(concat(["config-server", "discovery-server", "bff", "rabbitmq", "mailpit"], keys(var.domain_microservices), [for k in keys(var.domain_microservices) : "oracle-${k}"]))
   name              = "/ecs/${var.project}-${each.key}"
-  retention_in_days = 30 # ERS.md §4.12
+  retention_in_days = 30
 }
