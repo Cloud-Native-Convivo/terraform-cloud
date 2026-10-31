@@ -190,10 +190,11 @@ resource "aws_secretsmanager_secret_version" "rabbitmq_bff_url" {
 }
 
 # ---------------------------------------------------------
-# Relay SMTP (Gmail) para la notificacion por correo de
-# ms-gastos-comunes (NotificacionGastosConsumer). A diferencia de los
-# secretos de arriba, este no lo genera Terraform (random_password): es
-# una credencial externa (App Password de Gmail), viene de var.mail_password
+# Relay SMTP (Brevo) para la notificacion por correo de ms-gastos-comunes
+# (NotificacionGastosConsumer) y ms-espacios-comunes (app/events/correo.py).
+# A diferencia de los secretos de arriba, este no lo genera Terraform
+# (random_password): es una credencial externa (clave SMTP de Brevo), viene
+# de var.mail_password
 # -- mismo patron que docker_hub_token/cognito_google_client_secret.
 resource "aws_secretsmanager_secret" "mail_password" {
   name                    = "${var.project}/mail/password"

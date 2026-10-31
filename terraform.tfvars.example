@@ -22,17 +22,27 @@ service_env_vars = {
     CONVIVO_ENTRA_CLAIMMAP_ADMIN     = "administrador"
     SPRING_PROFILES_ACTIVE           = "aws"
     EUREKA_ENABLED                   = "false"
-    # Cuenta Gmail del relay SMTP (NotificacionGastosConsumer). No es secreta
-    # por si sola -- el App Password va aparte, en mail_password (abajo).
-    MAIL_USERNAME                    = "tu-cuenta@gmail.com"
-    MAIL_FROM                        = "tu-cuenta@gmail.com"
+    # Relay SMTP Brevo (NotificacionGastosConsumer). Usuario y remitente no
+    # son secretos -- la clave SMTP va aparte, en mail_password (abajo).
+    # SPRING_MAIL_* pisa el host/puerto fijos (smtp.gmail.com) de application-aws.yml.
+    SPRING_MAIL_HOST                 = "smtp-relay.brevo.com"
+    SPRING_MAIL_PORT                 = "587"
+    MAIL_USERNAME                    = "usuario-smtp-de-brevo"
+    MAIL_FROM                        = "convivo.notificaciones.par@gmail.com"
+  }
+  # Mismo relay para ms-espacios-comunes (app/events/correo.py hace STARTTLS + login
+  # si SMTP_USUARIO no esta vacio). La clave (SMTP_CLAVE) sale del mismo secret.
+  "ms-espacios-comunes" = {
+    SMTP_HOST    = "smtp-relay.brevo.com"
+    SMTP_PORT    = "587"
+    SMTP_USUARIO = "usuario-smtp-de-brevo"
+    MAIL_FROM    = "convivo.notificaciones.par@gmail.com"
   }
 }
 
-# App Password de Gmail (myaccount.google.com/apppasswords, cuenta con 2FA
-# activo) para el relay SMTP de ms-gastos-comunes -- nunca la contraseña real
-# de la cuenta. Va a AWS Secrets Manager (secrets.tf), no al código.
-mail_password = "tu-app-password-de-16-letras-sin-espacios"
+# Clave SMTP generada en Brevo (SMTP & API > SMTP) -- no la contraseña de la
+# cuenta de Brevo. Va a AWS Secrets Manager (secrets.tf), no al código.
+mail_password = "tu-clave-smtp-de-brevo"
 
 # Cantidad de tareas deseadas para microservicios de dominio (TD-06):
 # 1 para demo en AWS Academy Learner Lab ($100 presupuesto de por vida), subir a >=2 para HA en producción.

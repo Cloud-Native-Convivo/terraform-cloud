@@ -604,12 +604,6 @@ resource "aws_ecs_task_definition" "domain" {
           { name = "EUREKA_ENABLED", value = "false" },
           { name = "JAVA_TOOL_OPTIONS", value = "-Doracle.jdbc.timezoneAsRegion=false -Duser.timezone=UTC" },
         ] : [],
-        each.key == "ms-espacios-comunes" ? [
-          # Mailpit se resuelve por el NLB interno, igual que RabbitMQ/Eureka
-          # (Cloud Map bloqueado en Learner Lab) -- ver aws_ecs_service.mailpit.
-          { name = "SMTP_HOST", value = aws_lb.internal.dns_name },
-          { name = "SMTP_PORT", value = "1025" },
-        ] : [],
         [for k, v in lookup(var.service_env_vars, each.key, {}) : { name = k, value = v }]
       )
       secrets = concat(
@@ -622,6 +616,9 @@ resource "aws_ecs_task_definition" "domain" {
         ],
         each.key == "ms-gastos-comunes" ? [
           { name = "MAIL_PASSWORD", valueFrom = aws_secretsmanager_secret.mail_password.arn },
+        ] : [],
+        each.key == "ms-espacios-comunes" ? [
+          { name = "SMTP_CLAVE", valueFrom = aws_secretsmanager_secret.mail_password.arn },
         ] : []
       )
       logConfiguration = {
