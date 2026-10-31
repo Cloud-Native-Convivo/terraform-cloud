@@ -55,7 +55,7 @@ variable "cognito_google_client_secret" {
 }
 
 variable "mail_password" {
-  description = "App Password de Gmail (cuenta con 2FA, generada en myaccount.google.com/apppasswords) para el relay SMTP de notificaciones de ms-gastos-comunes. No es la contraseña de la cuenta."
+  description = "Clave SMTP generada en Brevo (SMTP & API > SMTP) para el relay smtp-relay.brevo.com de ms-gastos-comunes y ms-espacios-comunes. No es la contraseña de la cuenta de Brevo."
   type        = string
   sensitive   = true
 }
