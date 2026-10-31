@@ -66,7 +66,13 @@ resource "aws_ecs_service" "rabbitmq" {
     container_port   = 5672
   }
 
-  depends_on = [aws_lb_listener.rabbitmq]
+  load_balancer {
+    target_group_arn = aws_lb_target_group.rabbitmq_ui.arn
+    container_name   = "rabbitmq"
+    container_port   = 15672
+  }
+
+  depends_on = [aws_lb_listener.rabbitmq, aws_lb_listener.rabbitmq_ui]
 }
 
 resource "aws_ecs_service" "mailpit" {

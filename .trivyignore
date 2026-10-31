@@ -9,3 +9,10 @@ AWS-0104
 # agrega costo mensual y gestion de key policy sin ganancia en este alcance. Revisar al
 # declarar CMK para el resto de la infraestructura.
 AWS-0098 exp:2027-04-30
+
+# AWS-0053: NLB publico aws_lb.rabbitmq_ui (nlb.tf) para la consola web de RabbitMQ.
+# Aceptado solo para la demo en Learner Lab: sin dominio ni certificado no hay TLS y no se
+# filtra por IP; el acceso lo limita el login del usuario convivo-observador (tag monitoring,
+# permisos vacios: ve colas, no lee mensajes ni purga). Quitar el NLB o restringirlo por IP
+# al terminar la demo; la excepcion vence sola.
+AWS-0053 exp:2026-12-31

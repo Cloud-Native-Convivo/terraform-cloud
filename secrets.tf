@@ -154,10 +154,13 @@ locals {
     }
   }
   rabbitmq_admin_user = "convivo-admin"
+  # Usuario para compartir la consola web: tag monitoring (ve colas, no modifica)
+  # y permisos vacios (no puede leer mensajes ni purgar). El admin no se comparte.
+  rabbitmq_observador_user = "convivo-observador"
 }
 
 resource "random_password" "rabbitmq" {
-  for_each = toset(concat(["admin"], keys(local.rabbitmq_usuarios)))
+  for_each = toset(concat(["admin", "observador"], keys(local.rabbitmq_usuarios)))
   length   = 32
   special  = false # va dentro de JSON y de la URL amqp:// del BFF sin escapar
 }
