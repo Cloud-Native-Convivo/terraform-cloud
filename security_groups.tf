@@ -39,3 +39,16 @@ resource "aws_security_group_rule" "microservices_self_ingress" {
   security_group_id = aws_security_group.microservices.id
   cidr_blocks       = [var.microservices_subnet_cidr]
 }
+
+# El NLB publico de la consola de RabbitMQ vive en la subnet publica y, con
+# preserve_client_ip = false, llega a la task con una IP de esa subnet. El resto
+# de la VPC sigue sin poder entrar al 15672 desde fuera de las subnets propias.
+resource "aws_security_group_rule" "rabbitmq_ui_from_public_nlb" {
+  type              = "ingress"
+  description       = "Consola de management de RabbitMQ desde el NLB publico"
+  from_port         = 15672
+  to_port           = 15672
+  protocol          = "tcp"
+  security_group_id = aws_security_group.microservices.id
+  cidr_blocks       = [var.public_subnet_cidr]
+}

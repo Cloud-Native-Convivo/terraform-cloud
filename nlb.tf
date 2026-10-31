@@ -91,6 +91,44 @@ resource "aws_lb_listener" "rabbitmq" {
   }
 }
 
+# Consola web de RabbitMQ (management, 15672) para que el equipo vea las colas
+# sin entrar a la VPC. NLB publico aparte del interno: sin lista de IPs, el
+# acceso lo controla el login de RabbitMQ con un usuario de solo monitoreo
+# (secrets.tf, convivo-observador). Va por HTTP: sin dominio ni certificado en
+# Learner Lab no hay TLS, asi que la credencial viaja sin cifrar -- no reusar
+# esa password en otro lado.
+resource "aws_lb" "rabbitmq_ui" {
+  name               = "${var.project}-nlb-rabbitmq-ui"
+  internal           = false
+  load_balancer_type = "network"
+  subnets            = [aws_subnet.public.id]
+}
+
+resource "aws_lb_target_group" "rabbitmq_ui" {
+  name               = "${var.project}-tg-rabbitmq-ui"
+  port               = 15672
+  protocol           = "TCP"
+  vpc_id             = aws_vpc.main.id
+  target_type        = "ip"
+  preserve_client_ip = false
+
+  health_check {
+    protocol = "TCP"
+    port     = "15672"
+  }
+}
+
+resource "aws_lb_listener" "rabbitmq_ui" {
+  load_balancer_arn = aws_lb.rabbitmq_ui.arn
+  port              = 80
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.rabbitmq_ui.arn
+  }
+}
+
 # Mailpit (correo de prueba, SES no disponible en Academy Learner Lab). SMTP
 # (1025) es el puerto funcional -- lo usa ms-espacios-comunes para enviar
 # correo, mismo motivo que RabbitMQ 5672 arriba (Cloud Map bloqueado, IPs de

@@ -344,6 +344,7 @@ resource "aws_ecs_task_definition" "rabbitmq" {
       ]
       secrets = concat(
         [{ name = "RABBITMQ_DEFAULT_PASS", valueFrom = aws_secretsmanager_secret.rabbitmq["admin"].arn }],
+        [{ name = "RABBITMQ_PASS_OBSERVADOR", valueFrom = aws_secretsmanager_secret.rabbitmq["observador"].arn }],
         [for nombre, u in local.rabbitmq_usuarios : { name = u.env, valueFrom = aws_secretsmanager_secret.rabbitmq[nombre].arn }],
       )
       logConfiguration = {
@@ -423,11 +424,14 @@ locals {
     api 'permissions/%2F/${nombre}' '{"configure":"${u.recursos}","write":"${u.recursos}","read":"${u.recursos}"}'
     api 'topic-permissions/%2F/${nombre}' '{"exchange":"espacios_events","write":"${u.topic_write}","read":".*"}'
     %{~endfor}
+    # Usuario de la consola web compartida: monitoring ve colas; permisos vacios = no lee mensajes ni purga.
+    api 'users/${local.rabbitmq_observador_user}' '{"password":"'"$RABBITMQ_PASS_OBSERVADOR"'","tags":"monitoring"}'
+    api 'permissions/%2F/${local.rabbitmq_observador_user}' '{"configure":"","write":"","read":""}'
     echo "rabbitmq-bootstrap: usuarios por servicio creados"
   EOT
   , "\r", "")
 }
-# ERS.md TD-11 resuelto: RabbitMQ self-hosted en Fargate con volumen persistente EFS (aws_efs_file_system.rabbitmq).
+# TD-11 resuelto: RabbitMQ self-hosted en Fargate con volumen persistente EFS (aws_efs_file_system.rabbitmq).
 # Imagen oficial de Docker Hub, no requiere build propio.
 
 resource "aws_ecs_task_definition" "bff" {

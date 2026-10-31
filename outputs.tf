@@ -13,6 +13,16 @@ output "ecs_cluster_name" {
   value       = aws_ecs_cluster.main.name
 }
 
+output "rabbitmq_ui_url" {
+  description = "Consola web de RabbitMQ (HTTP). Usuario: rabbitmq_ui_user; password en Secrets Manager convivo/rabbitmq/observador."
+  value       = "http://${aws_lb.rabbitmq_ui.dns_name}"
+}
+
+output "rabbitmq_ui_user" {
+  description = "Usuario de solo monitoreo para la consola web de RabbitMQ."
+  value       = local.rabbitmq_observador_user
+}
+
 output "cognito_user_pool_id" {
   description = "ID del User Pool de residentes."
   value       = aws_cognito_user_pool.residentes.id
