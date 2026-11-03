@@ -15,7 +15,6 @@ __pycache__/
 tfplan
 *.tfplan
 
-.projectmem/events.jsonl
-.projectmem/watch.pid
-.projectmem/watch.log
-.projectmem/structure.json
+
+# Memoria local de projectmem (por persona, no se versiona)
+.projectmem/
