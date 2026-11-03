@@ -6,6 +6,8 @@ updates:
       default-days: 7
     directory: "/"
     target-branch: develop
+    commit-message:
+      prefix: ":arrow_up: chore(deps)"
     schedule:
       interval: weekly
     labels:
@@ -23,6 +25,8 @@ updates:
       default-days: 7
     directory: "/"
     target-branch: develop
+    commit-message:
+      prefix: ":construction_worker: ci(deps)"
     schedule:
       interval: weekly
     labels:
