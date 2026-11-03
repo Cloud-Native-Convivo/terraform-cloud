@@ -150,6 +150,10 @@ Ejemplos:
 
 **Regla de no-firma:** Nunca agregar trailers de autoría de agente/IA (`Co-Authored-By: Claude`, etc.) en commits o descripciones de PR.
 
+**Branch protection / PR:** `main` y `develop` protegidas en GitHub: requieren PR, sin review obligatorio (equipo de dos personas: a menudo no hay otra persona que apruebe), con la rama al día (`strict`) y conversaciones resueltas; ni los administradores pueden saltarse las reglas (`enforce_admins`) y no hay force push ni borrado; checks de CI en verde obligatorios.
+
+**Checks obligatorios de este repo** (estado verificado el 2026-11-03): en `develop`, `Terraform Validate & Format`; en `main`, los mismos y además `TFLint`, `IaC Security (Trivy)`, `PR Title`, `Workflow Lint`, `Analyze (actions)`. El auto-merge está permitido: Dependabot lo activa con squash solo para parches y versiones menores (`.github/workflows/dependabot-auto.yml`) y los saltos de versión mayor se mergean a mano. Detalle y comparación con los demás repos: `AGENTS.md` raíz del workspace, §11.3.
+
 ## 12. Límites del agente
 
 **Siempre (sin pedir permiso):**
