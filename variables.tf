@@ -130,6 +130,14 @@ variable "domain_microservices" {
       db_name     = "condominios_db"
       health_path = "/docs"
     }
+    # Usuarios, identidades y roles por condominio. Igual que ms-condominios, sin /health propio.
+    # Requisito antes del apply: su repo aún no publica la imagen en Docker Hub (falta un
+    # docker-publish.yml como el de ms-condominios); sin ella la task no puede arrancar.
+    "ms-usuario-cloud" = {
+      port        = 8085
+      db_name     = "usuarios_db"
+      health_path = "/docs"
+    }
   }
 }
 

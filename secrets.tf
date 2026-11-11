@@ -144,6 +144,13 @@ locals {
       recursos    = "^condominios_events$"
       topic_write = "^$"
     }
+    # ms-usuario-cloud no usa RabbitMQ. Su task inyecta RABBITMQ_* igual que las demás
+    # (for_each sobre domain_microservices), así que tiene usuario sin ningún permiso.
+    "ms-usuario-cloud" = {
+      env         = "RABBITMQ_PASS_USUARIO"
+      recursos    = "^$"
+      topic_write = "^$"
+    }
     # El BFF declara espacios_events y el fanout gastos.pdf.fanout, y manda comandos a las
     # colas de comandos por el exchange por defecto (amq.default en los permisos). No publica
     # routing keys en espacios_events: topic_write "^$" se lo impide.
