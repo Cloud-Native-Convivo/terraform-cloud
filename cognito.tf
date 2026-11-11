@@ -163,4 +163,11 @@ resource "aws_cognito_user_pool_client" "residentes" {
 
   # Respuestas genéricas ante usuario inexistente: no revela qué correos están registrados.
   prevent_user_existence_errors = "ENABLED"
+
+  # generate_secret solo se fija al crear el cliente y AWS no lo devuelve: tras importar el cliente
+  # existente el estado lo trae en null y el plan propone REEMPLAZARLO (nuevo Client ID, login roto
+  # en el frontend desplegado). El cliente es público (false) tanto en AWS como acá.
+  lifecycle {
+    ignore_changes = [generate_secret]
+  }
 }

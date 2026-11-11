@@ -26,7 +26,7 @@ Cuando dos reglas de este archivo entran en conflicto, se resuelven en este orde
 
 ## 1. Resumen del proyecto
 
-Infraestructura como Código (IaC) para la plataforma **Convivo** en Amazon Web Services (AWS), región `us-east-1`. Provee la red (VPC, subnets públicas/privadas, Security Groups), balanceo interno (NLB), API Gateway HTTP API con VPC Link y Lambda Authorizer liviano (`jwt-basico`), clúster ECS Fargate con 6 servicios contenerizados (BFF, Espacios Comunes con sidecar Oracle Free, Gastos Comunes con sidecar Oracle Free, Config Server, Discovery Server y RabbitMQ), Secrets Manager y User Pool en Amazon Cognito (residentes, federado con Google).
+Infraestructura como Código (IaC) para la plataforma **Convivo** en Amazon Web Services (AWS), región `us-east-1`. Provee la red (VPC, subnets públicas/privadas, Security Groups), balanceo interno (NLB), API Gateway HTTP API con VPC Link y Lambda Authorizer liviano (`jwt-basico`), clúster ECS Fargate con 9 servicios contenerizados (BFF, Espacios Comunes, Gastos Comunes, Condominios y Usuario Cloud —los cuatro de dominio con sidecar Oracle Free—, Config Server, Discovery Server, RabbitMQ y Mailpit), Secrets Manager y User Pool en Amazon Cognito (residentes, federado con Google).
 
 Entorno de ejecución objetivo: **AWS Academy Learner Lab** (cuenta sin permisos `iam:CreateRole`, reusando `LabRole` preexistente, y con credenciales temporales con sesión de 4 horas).
 
