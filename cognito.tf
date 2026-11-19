@@ -95,6 +95,14 @@ resource "aws_cognito_identity_provider" "google" {
     client_id        = var.cognito_google_client_id
     client_secret    = var.cognito_google_client_secret
     authorize_scopes = "openid email profile"
+    # Cognito agrega estas claves al crear un IdP de Google; sin declararlas, cada plan
+    # propone borrarlas (cambio in-place perpetuo, detectado en la corrida contra aws-emulator).
+    attributes_url                = "https://people.googleapis.com/v1/people/me?personFields="
+    attributes_url_add_attributes = "true"
+    authorize_url                 = "https://accounts.google.com/o/oauth2/v2/auth"
+    oidc_issuer                   = "https://accounts.google.com"
+    token_request_method          = "POST"
+    token_url                     = "https://www.googleapis.com/oauth2/v4/token"
   }
 
   attribute_mapping = {

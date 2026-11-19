@@ -325,9 +325,9 @@ resource "aws_ecs_task_definition" "rabbitmq" {
     },
     {
       # Crea los usuarios por servicio vía API de management en cada arranque:
-      # el broker no tiene volumen persistente, así que un restart los borra
-      # junto con las colas. Mientras corre, los servicios reciben
-      # ACCESS_REFUSED y reintentan la conexión.
+      # las PUT son idempotentes, así que sobre el volumen EFS persistente solo
+      # reafirma usuarios y permisos (y repone las passwords si se rotaron).
+      # Mientras corre, los servicios reciben ACCESS_REFUSED y reintentan la conexión.
       name       = "rabbitmq-bootstrap"
       image      = "docker.io/curlimages/curl:8.11.1"
       essential  = false
