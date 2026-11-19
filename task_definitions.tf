@@ -49,10 +49,6 @@ locals {
       db_name = "condominios_db"
       db_user = "condominios_user"
     }
-    "ms-usuario-cloud" = {
-      db_name = "usuarios_db"
-      db_user = "usuarios_user"
-    }
   }
 }
 
@@ -465,7 +461,6 @@ resource "aws_ecs_task_definition" "bff" {
         { name = "ESPACIOS_COMUNES_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-espacios-comunes"].port}" },
         { name = "GASTOS_COMUNES_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-gastos-comunes"].port}" },
         { name = "CONDOMINIOS_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-condominios"].port}" },
-        { name = "USUARIOS_URL", value = "http://${aws_lb.internal.dns_name}:${var.domain_microservices["ms-usuario-cloud"].port}" },
         # Default del BFF son 2s: arranque en frío de JVM/Oracle lo supera y
         # abre el circuit breaker antes de que el downstream llegue a responder.
         { name = "PROXY_TIMEOUT_MS", value = "10000" },
