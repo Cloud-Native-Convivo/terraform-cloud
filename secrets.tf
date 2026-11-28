@@ -147,9 +147,12 @@ locals {
     # El BFF declara espacios_events y el fanout gastos.pdf.fanout, y manda comandos a las
     # colas de comandos por el exchange por defecto (amq.default en los permisos). No publica
     # routing keys en espacios_events: topic_write "^$" se lo impide.
+    # Los DLX estan en el patron porque RabbitMQ exige escritura en el dead-letter exchange para
+    # crear una cola con x-dead-letter-exchange, y el BFF puede declarar las colas de comandos
+    # antes que los consumidores.
     "bff" = {
       env         = "RABBITMQ_PASS_BFF"
-      recursos    = "^(espacios_events|gastos[.]pdf[.]fanout|espacios_comandos_queue|gastos_comandos_queue|amq[.]default)$"
+      recursos    = "^(espacios_events|gastos[.]pdf[.]fanout|espacios_comandos_queue|gastos_comandos_queue|amq[.]default|espacios_dlx|gastos[.]dlx)$"
       topic_write = "^$"
     }
   }
