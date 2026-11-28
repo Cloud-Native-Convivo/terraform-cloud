@@ -134,7 +134,7 @@ locals {
     }
     "ms-gastos-comunes" = {
       env         = "RABBITMQ_PASS_GASTOS"
-      recursos    = "^(espacios_events|gastos[.]dlx|gastos[.]pdf[.]fanout|gastos_reserva_creada_queue|gastos_reserva_creada_dlq|gastos_reserva_expirada_queue|gastos_reserva_expirada_dlq|gastos_comandos_queue|gastos_pdf_generacion_queue|gastos_notificaciones_email_queue)$"
+      recursos    = "^(espacios_events|gastos[.]dlx|gastos[.]pdf[.]fanout|gastos_reserva_creada_queue|gastos_reserva_creada_dlq|gastos_reserva_expirada_queue|gastos_reserva_expirada_dlq|gastos_comandos_queue|gastos_comandos_dlq|gastos_pdf_generacion_queue|gastos_notificaciones_email_queue)$"
       topic_write = "^(gasto_fallido|reserva_pagada)$"
     }
     # Outbox de ms-condominios: solo declara y publica en su propio exchange topic
